@@ -3,8 +3,7 @@ certirocq_vanilla_plugin.cmxa: certirocq_vanilla_plugin.cmx ../../runtime/get_or
 
 g_certirocq_vanilla.ml: g_certirocq_vanilla.mlg ../common/certirocq_commands.mlg
 	$(SHOW)'CPP+COQPP $<'
-	$(HIDE)tmp=$$(mktemp /tmp/g_certirocq_vanilla.XXXXXX.mlg); \
-		cpp -traditional-cpp -P $< > $$tmp; \
-		$(COQPP) $$tmp; \
-		mv $${tmp%.mlg}.ml $@; \
-		rm -f $$tmp
+	$(HIDE)cpp -traditional-cpp -P $< > $(@:.ml=.cpp.mlg) && \
+		$(COQPP) $(@:.ml=.cpp.mlg) && \
+		mv $(@:.ml=.cpp.ml) $@ && \
+		rm -f $(@:.ml=.cpp.mlg)

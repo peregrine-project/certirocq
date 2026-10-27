@@ -1,0 +1,8 @@
+# Do not install the sources of the extraction drivers. CompCert's build runs
+# `coqtop -load-vernac-source extraction/extraction.v`, and Rocq looks that
+# relative name up in the load path before the current directory, so an
+# installed CertiRocq/extraction/extraction.v is loaded in place of CompCert's
+# own and any later rebuild of coq-compcert fails.
+install-extra::
+	rm -f "$(COQLIBINSTALL)/CertiRocq/extraction/extraction.v" \
+	      "$(COQLIBINSTALL)/CertiRocq/extraction_vanilla/extraction.v"

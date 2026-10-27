@@ -141,7 +141,7 @@ Definition case_result (env : nenv) (y : var)
            (r : list (block typ) * list (N * (tint_literal * block_id)) * positive)
   : list (block typ) * positive :=
   let '(arm_blks, aedges, f1) := r in
-  let dflt := entry_id arm_blks (Pos.succ (Pos.succ f1)) in
+  let dflt := entry_id arm_blks (Pos.succ f1) in
   ( case_test_blk env y f1 :: case_unboxed_blk env y f1 dflt aedges
       :: case_boxed_blk env y f1 dflt aedges :: arm_blks,
     Pos.succ (Pos.succ (Pos.succ f1)) ).
@@ -367,8 +367,8 @@ Lemma tr_case env chunk y arms fresh arm_blks aedges f1 :
   arm_loop_d (fun ae fr => tr env 0%N ae fr) go ga arms fresh = (arm_blks, aedges, f1) ->
   tr env chunk (Ecase y arms) fresh =
   (case_test_blk env y f1
-     :: case_unboxed_blk env y f1 (entry_id arm_blks (Pos.succ (Pos.succ f1))) aedges
-     :: case_boxed_blk env y f1 (entry_id arm_blks (Pos.succ (Pos.succ f1))) aedges
+     :: case_unboxed_blk env y f1 (entry_id arm_blks (Pos.succ f1)) aedges
+     :: case_boxed_blk env y f1 (entry_id arm_blks (Pos.succ f1)) aedges
      :: arm_blks,
    Pos.succ (Pos.succ (Pos.succ f1))).
 Proof. intros H. rewrite tr_case_unfold, H. reflexivity. Qed.
@@ -898,7 +898,7 @@ Proof.
       by (intros; econstructor; eauto).
     destruct (arm_loop_ok env _ arms HF HE _ _ _ _ Harm)
       as (Hle & Hlbl & Hnd & Hent & Hcl & Hph & Hdef & Hed).
-    set (dflt := entry_id AB (Pos.succ (Pos.succ f1))).
+    set (dflt := entry_id AB (Pos.succ f1)).
     set (T := case_test_blk env y f1).
     set (U := case_unboxed_blk env y f1 dflt ED).
     set (X := case_boxed_blk env y f1 dflt ED).
@@ -918,7 +918,7 @@ Proof.
     assert (Hdflt : In dflt (map blk_id [T; U; X]) \/
                     exists bb, In bb AB /\ blk_id bb = dflt /\ blk_phis bb = []).
     { subst dflt. destruct AB as [|h AB'].
-      - left. rewrite HO. left. reflexivity.
+      - left. rewrite HO. right. left. reflexivity.
       - right. exists h. split; [left; reflexivity|]. split; [reflexivity|]. eapply Hent; eauto. }
     assert (Hedges : forall p l, In l (map snd (map snd (List.filter p ED))) ->
                        exists bb, In bb AB /\ blk_id bb = l /\ blk_phis bb = []).

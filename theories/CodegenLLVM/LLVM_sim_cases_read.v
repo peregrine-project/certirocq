@@ -947,7 +947,7 @@ Section CasesRead.
     destruct (arm_loop_d (fun ae fr => tr env 0%N ae fr) (ord_of cenv) (arity_of cenv) arms fresh)
       as [[ab aedges] f1] eqn:Ha.
     rewrite (tr_case _ _ _ _ env chunk y arms fresh ab aedges f1 Ha) in Htr. injection Htr as <- <-.
-    set (dflt := entry_id ab (Pos.succ (Pos.succ f1))).
+    set (dflt := entry_id ab (Pos.succ f1)).
     assert (Hab : forall b, In b ab -> exists c, RM.find (blk_id b) (CFG.ocfg_map B) = Some (LLVM_sim.flatB (cblock b) c))
       by (intros b Hb; apply Hbl; right; right; exact Hb).
     destruct (Hbl (case_unboxed_blk env y f1 dflt aedges) (or_introl eq_refl)) as (cu & Hfu).

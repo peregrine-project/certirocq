@@ -20,9 +20,9 @@ authors: ["Andrew Appel"
 license: "MIT"
 build: [
   ["bash" "./configure.sh"]
-  [make "all"]
-  [make "plugins"]
-  [make "bootstrap"]
+  [make "-j%{jobs}%" "all"]
+  [make "-j%{jobs}%" "plugins"]
+  [make "-j%{jobs}%" "bootstrap"]
 ]
 install: [
   [make "install"]
@@ -38,6 +38,7 @@ depends: [
   "rocq-metarocq-safechecker-plugin" {>= "1.5.1"}
   "coq-ext-lib" {>= "0.12"}
   "coq-wasm" {>= "2.2.1"}
+  "rocq-mathcomp-ssreflect" {< "2.6~"}
   "rocq-vellvm" {> "3.0.20260707"}
 ]
 # The LLVM backend (theories/CodegenLLVM) needs Vellvm's current AST

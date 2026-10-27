@@ -579,8 +579,12 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
       let boxed_lbl   := Anon (Zpos f1) in
       let unboxed_lbl := Anon (Zpos (Pos.succ f1)) in
       let test_lbl    := Anon (Zpos (Pos.succ (Pos.succ f1))) in
+      (* With no arms, default to [unboxed] rather than [test]: [test] can be
+         the entry block of the function, which LLVM does not allow to have
+         predecessors.  The case is unreachable for an evaluating program;
+         either way it loops. *)
       let default_lbl :=
-        match arm_blks with b :: _ => blk_id b | [] => test_lbl end in
+        match arm_blks with b :: _ => blk_id b | [] => unboxed_lbl end in
       let test_blk :=
         mk_block test_lbl [] []
           (IVoid 3%Z, TERM_Br (TYPE_I 1%positive, is_block (nvar env y)) boxed_lbl unboxed_lbl, [])
