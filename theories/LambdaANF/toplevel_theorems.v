@@ -560,6 +560,12 @@ Section Compose.
     correct cenv merge_dup_funs_trans.
   Admitted.
 
+  (* TODO: prove. [Eletapp x f ft ys (Ehalt x)] and [Eapp f ft ys] evaluate the same
+     body to the same value. *)
+  Lemma tail_letapp_correct :
+    correct cenv tail_letapp_trans.
+  Admitted.
+
   Lemma correct_id_trans :
     correct cenv id_trans.
   Proof.
@@ -579,6 +585,11 @@ Section Compose.
   Proof.
     intros Heq.
     unfold anf_pipeline.
+    eapply correct_cc_compose_l.
+
+    eapply correct_time.
+    now eapply tail_letapp_correct.
+
     eapply correct_cc_compose_l.
 
     eapply correct_time.
