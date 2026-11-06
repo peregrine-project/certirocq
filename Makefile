@@ -4,7 +4,7 @@ PLUGIN_MANIFEST_INPUTS=plugins/manifests/generate.py plugins/manifests/plugin-ma
 PLUGIN_MANIFEST_OUTPUTS=plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
 PYTHON ?= python3
 
-all theories/Extraction/extraction.vo theories/ExtractionVanilla/extraction.vo: theories/Makefile libraries/Makefile
+all theories/Extraction/extraction.vo theories/ExtractionVanilla/extraction.vo &: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries 
 	$(MAKE) -C theories 
 
