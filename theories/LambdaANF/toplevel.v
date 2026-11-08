@@ -4,7 +4,7 @@ From CertiRocq Require Import
      LambdaANF.term LambdaANF.term_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
      LambdaANF.inline LambdaANF.uncurry LambdaANF.closure_conversion
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting
-     LambdaANF.merge_dup_funs.
+     LambdaANF.merge_dup_funs LambdaANF.tail_letapp.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_convert_env.
 From CertiRocq.LambdaBox_to_LambdaANF Require anf cps.
 (* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
@@ -171,6 +171,9 @@ Section IDENT.
   Definition merge_dup_funs_trans : anf_trans :=
     fun e c => (Ret (merge_dup_funs 10 e), c).
 
+  Definition tail_letapp_trans : anf_trans :=
+    fun e c => (Ret (tail_letapp e), c).
+
   Section Pipeline.
 
     Context (anf_opts : anf_options).
@@ -181,6 +184,7 @@ Section IDENT.
     (* Optimizing λANF pipeline *)
 
     Definition anf_pipeline (e : exp) : anf_state exp :=
+      e <- time_anf "Tail calls" tail_letapp_trans e;;
       e <- time_anf "Shrink" shrink_err e;;
       e <- time_anf "Uncurry" (uncurry_top (cps anf_opts)) e ;;
       e <- time_anf "Inline uncurry wrappers" (inline_uncurry next_var 10 100) e ;;

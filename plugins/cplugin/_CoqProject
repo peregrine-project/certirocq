@@ -327,6 +327,8 @@ extraction/memtype.ml
 extraction/memtype.mli
 extraction/merge_dup_funs.ml
 extraction/merge_dup_funs.mli
+extraction/tail_letapp.ml
+extraction/tail_letapp.mli
 extraction/metarocq_pipeline.ml
 extraction/metarocq_pipeline.mli
 extraction/model.ml

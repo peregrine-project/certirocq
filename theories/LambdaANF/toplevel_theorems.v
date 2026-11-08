@@ -467,7 +467,7 @@ End DPE.
 
 End ToplevelTheorems.
 
-Require Import ExtLib.Structures.Monad LambdaANF.toplevel.
+Require Import ExtLib.Structures.Monad LambdaANF.toplevel LambdaANF.tail_letapp_correct.
 Import MonadNotation.
 
 
@@ -560,6 +560,20 @@ Section Compose.
     correct cenv merge_dup_funs_trans.
   Admitted.
 
+  (* The rewritten [Eletapp] takes one step more than the [Eapp]: [inline_bound 1 1]
+     absorbs it, see [tail_letapp_correct.v]. *)
+  Lemma tail_letapp_correct :
+    correct cenv tail_letapp_trans.
+  Proof.
+    intros e c [Hun Hdis] Hmax.
+    edestruct (tail_letapp_correct_top cenv e) as [Hun' [Hdis' [Hfv [Hbv Hrel]]]]; eauto.
+    do 2 eexists. split; [ reflexivity | ].
+    split; [ split; eassumption | ].
+    split. eapply Pos.le_lt_trans; [| eassumption ]. eapply max_var_le. sets.
+    eexists. econstructor 1. intros. eapply Hrel. eassumption. eassumption.
+    split. eapply inline_bound_compat. lia. eapply inline_bound_post_upper_bound.
+  Qed.
+
   Lemma correct_id_trans :
     correct cenv id_trans.
   Proof.
@@ -579,6 +593,11 @@ Section Compose.
   Proof.
     intros Heq.
     unfold anf_pipeline.
+    eapply correct_cc_compose_l.
+
+    eapply correct_time.
+    now eapply tail_letapp_correct.
+
     eapply correct_cc_compose_l.
 
     eapply correct_time.
