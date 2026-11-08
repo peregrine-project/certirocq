@@ -84,6 +84,7 @@ LambdaANF/inline_correct.v
 LambdaANF/merge_dup_funs.v
 LambdaANF/tail_letapp.v
 LambdaANF/tail_letapp_correct.v
+LambdaANF/merge_dup_funs_correct.v
 LambdaANF/toplevel.v
 LambdaANF/toplevel_theorems.v
 
