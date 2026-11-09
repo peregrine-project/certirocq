@@ -467,7 +467,8 @@ End DPE.
 
 End ToplevelTheorems.
 
-Require Import ExtLib.Structures.Monad LambdaANF.toplevel LambdaANF.tail_letapp_correct.
+Require Import ExtLib.Structures.Monad LambdaANF.toplevel LambdaANF.tail_letapp_correct
+        LambdaANF.merge_dup_funs LambdaANF.merge_dup_funs_correct.
 Import MonadNotation.
 
 
@@ -555,10 +556,45 @@ Section Compose.
 
   Opaque uncurry_top.
 
-  (* TODO: prove. Merging alpha-equivalent closed top-level functions. *)
+  (* Each round is related to its input with [simple_bound 0], see [merge_dup_funs_correct.v];
+     the rounds are chained. *)
   Lemma merge_dup_funs_correct :
     correct cenv merge_dup_funs_trans.
-  Admitted.
+  Proof.
+    assert (Hpost : post_prop cenv (simple_bound 0) (simple_bound 0)).
+    { split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
+    assert (Hiter : forall n e, well_scoped e ->
+              well_scoped (merge_dup_funs n e) /\
+              bound_var (merge_dup_funs n e) :|: occurs_free (merge_dup_funs n e) \subset
+                bound_var e :|: occurs_free e /\
+              exists m, preord_exp_n cenv wf_pres (post_prop cenv) m e (merge_dup_funs n e)).
+    { assert (Hrefl : forall e, well_scoped e ->
+                well_scoped e /\ bound_var e :|: occurs_free e \subset bound_var e :|: occurs_free e /\
+                exists m, preord_exp_n cenv wf_pres (post_prop cenv) m e e).
+      { intros e Hws. split; [ eassumption | split; [ reflexivity | ] ].
+        exists 1%nat. econstructor 1; [| | eassumption ].
+        - intros. eapply preord_exp_refl. eapply simple_bound_compat. eassumption.
+        - clear. firstorder. }
+      induction n as [| n IHn ]; intros e Hws; [ now eapply Hrefl | ].
+      destruct e; try now eapply Hrefl.
+      cbn [merge_dup_funs].
+      destruct (merge_list _ _ _ _ _ _) as [kept σ] eqn:Hm.
+      destruct (Nat.eqb _ _); [ now eapply Hrefl | ].
+      destruct Hws as [Hun Hdis].
+      edestruct (merge_step cenv) as [Hun' [Hdis' [Hfv [Hbv Hrel]]]];
+        [ eassumption | eassumption | exact Hm | ].
+      edestruct IHn as [Hws'' [Hsub [m Hm']]]; [ split; eassumption | ].
+      split; [ eassumption | split ].
+      - eapply Included_trans; [ eassumption | ]. sets.
+      - eexists. econstructor 2; [| eassumption ].
+        econstructor 1; [| eassumption | eassumption ].
+        intros. eapply Hrel. eassumption. }
+    intros e c Hws Hmax. destruct (Hiter 10%nat e Hws) as [Hws' [Hsub Hrel]].
+    do 2 eexists. split; [ reflexivity | ].
+    split; [ eassumption | ].
+    split; [| eassumption ].
+    eapply Pos.le_lt_trans; [| eassumption ]. eapply max_var_le. eassumption.
+  Qed.
 
   (* The rewritten [Eletapp] takes one step more than the [Eapp]: [inline_bound 1 1]
      absorbs it, see [tail_letapp_correct.v]. *)
