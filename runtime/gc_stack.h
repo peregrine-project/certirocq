@@ -112,7 +112,8 @@ typedef const uintnat *fun_info;
 #endif
 #define LOG_NURSERY_SIZE 16
 #define NURSERY_SIZE (1<<LOG_NURSERY_SIZE)
-#define MAX_SPACES (8*sizeof(value)-(2+LOG_WORDSIZE+LOG_NURSERY_SIZE)) /* how many generations */
+/* Keep byte differences within the signed pointer-offset range; see gc_stack.c. */
+#define MAX_SPACES (8*sizeof(value)-(1+LOG_WORDSIZE+LOG_NURSERY_SIZE)) /* how many generations */
 
 struct space { value *start, *next, *limit, *rem_limit; };
 struct heap {  struct space spaces[MAX_SPACES]; };
@@ -188,10 +189,8 @@ value* extract_answer(struct thread_info *ti);
 void* export_heap(struct thread_info *ti, value root);
 
 /* mutable write barrier */
-void certirocq_modify(struct thread_info *ti, value *p_cell, value p_val);
+void mutable_update(struct thread_info *ti, value *p_cell, value p_val);
 
 void print_heapsize(struct thread_info *ti);
-
-value closure_call(struct thread_info *, value, value);
 
 #endif /* CERTIROCQ_GC_STACK_H */
