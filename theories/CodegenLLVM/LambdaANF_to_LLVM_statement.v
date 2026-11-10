@@ -418,10 +418,7 @@ Inductive fundefs_ok (cenv : ctor_env) : fundefs -> Prop :=
 (** Two distinct constructors of one inductive with the same ordinal are one
     nullary and one not: the pipeline numbers the two classes separately
     ([LambdaBox_to_LambdaANF.common.convert_cnstrs]), and the emitted [case]
-    tests the low bit before switching on the ordinal.  (The Wasm backend's
-    [cenv_restricted] also forbids a boxed constructor from sharing its
-    ordinal with a nullary one, which the pipeline's numbering violates for
-    every inductive with both kinds, e.g. [nat]; see [LLVM_nonvacuity.nat_cenv_ok].) *)
+    tests the low bit before switching on the ordinal. *)
 Definition cenv_ok (cenv : ctor_env) : Prop :=
   forall t t' i i', t <> t' ->
     M.get t cenv = Some i -> M.get t' cenv = Some i' ->

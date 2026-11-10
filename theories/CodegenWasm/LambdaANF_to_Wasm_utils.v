@@ -1076,7 +1076,8 @@ Proof.
   injection H9 as <-.
   assert (ctor_arity0 = N.of_nat a'). { inv H5. lia. } subst ctor_arity0.
   have I := cases_same_ind_tag cl t t' e' _ _ H0 H3 Ht Ht'. cbn in I.
-  intro Hcontra. subst. eauto.
+  intro Hcontra. subst. apply H''.
+  refine (ex_intro _ _ (ex_intro _ _ (ex_intro _ (N.of_nat a') (conj _ Ht')))). lia.
 Qed.
 
 Lemma correct_cenv_of_exp_get_ctor_arity {cenv} : forall v t ys e,

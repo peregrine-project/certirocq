@@ -155,7 +155,7 @@ Definition cenv_restricted (cenv : ctor_env) : Prop :=
     forall t',
       t <> t' ->
       (a = 0%N -> ~ (exists name' iname', M.get t' cenv = Some (Build_ctor_ty_info name' iname' it 0%N ord))) /\
-        ((0 < a)%N -> ~ (exists name' iname' a', M.get t' cenv = Some (Build_ctor_ty_info name' iname' it a' ord))).
+        ((0 < a)%N -> ~ (exists name' iname' a', (0 < a')%N /\ M.get t' cenv = Some (Build_ctor_ty_info name' iname' it a' ord))).
 
 Definition ctor_ordinal_restricted (cenv : ctor_env) (t : ctor_tag) : Prop :=
   forall n, get_ctor_ord cenv t = Ret n ->
