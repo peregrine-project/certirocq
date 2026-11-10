@@ -5,7 +5,7 @@
     state their soundness next to the correctness statement. *)
 
 From Stdlib Require Import ZArith List Bool.
-Require Import LambdaANF.term.
+Require Import LambdaANF.term LambdaANF.identifiers LambdaANF.set_util.
 Require Import Common.AstCommon.
 Require Import CodegenLLVM.LambdaANF_to_LLVM.
 Import ListNotations.
@@ -117,9 +117,76 @@ Definition prog_parts (e : exp) : fundefs * exp :=
   | _ => (Fnil, e)
   end.
 
+(** ** Closedness and unique bindings
+
+    [ub e s] walks [e] with the set [s] of binders seen so far, and fails on a
+    repeated binder or a nested [Efun], which [fragment] excludes as well.  Each
+    binder costs one set operation, so the check is [O(n log n)]. *)
+Definition add_fresh (x : var) (s : PS.t) : option PS.t :=
+  if PS.mem x s then None else Some (PS.add x s).
+
+Fixpoint add_list (ys : list var) (s : PS.t) : option PS.t :=
+  match ys with
+  | [] => Some s
+  | y :: ys' =>
+      match add_fresh y s with
+      | Some s1 => add_list ys' s1
+      | None => None
+      end
+  end.
+
+Fixpoint ub (e : exp) (s : PS.t) : option PS.t :=
+  match e with
+  | Econstr x _ _ e' | Eproj x _ _ _ e' | Eletapp x _ _ _ e'
+  | Eprim_val x _ e' | Eprim x _ _ e' =>
+      match add_fresh x s with
+      | Some s1 => ub e' s1
+      | None => None
+      end
+  | Ecase _ bs =>
+      (fix go (bs : list (ctor_tag * exp)) (s : PS.t) : option PS.t :=
+         match bs with
+         | [] => Some s
+         | (_, e') :: bs' =>
+             match ub e' s with
+             | Some s1 => go bs' s1
+             | None => None
+             end
+         end) bs s
+  | Efun _ _ => None
+  | Eapp _ _ _ | Ehalt _ => Some s
+  end.
+
+Fixpoint ub_fundefs (fds : fundefs) (s : PS.t) : option PS.t :=
+  match fds with
+  | Fcons f _ ys e fds' =>
+      match add_fresh f s with
+      | None => None
+      | Some s1 =>
+          match add_list ys s1 with
+          | None => None
+          | Some s2 =>
+              match ub e s2 with
+              | None => None
+              | Some s3 => ub_fundefs fds' s3
+              end
+          end
+      end
+  | Fnil => Some s
+  end.
+
+Definition llvm_uniqueb (fds : fundefs) (main : exp) : bool :=
+  match ub_fundefs fds PS.empty with
+  | Some s => match ub main s with Some _ => true | None => false end
+  | None => false
+  end.
+
+Definition llvm_closedb (e : exp) : bool := PS.is_empty (exp_fv e).
+
 Definition llvm_fragmentb (cenv : ctor_env) (e : exp) : bool :=
   let '(fds, main) := prog_parts e in
-  fundefs_all (fun b => fst (fragment cenv b)) fds && fst (fragment cenv main) && cenv_okb cenv.
+  fundefs_all (fun b => fst (fragment cenv b)) fds && fst (fragment cenv main) && cenv_okb cenv
+  && llvm_closedb (Efun fds main) && llvm_uniqueb fds main.
 
 Definition llvm_buildable (cenv : ctor_env) (allocating : prim -> bool) (e : exp) : bool :=
   let '(fds, main) := prog_parts e in
