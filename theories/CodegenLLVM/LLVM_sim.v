@@ -365,7 +365,7 @@ Section Simulation.
        field st tinfo off_fp fp ->
        shadow_stack st fp rs ->
        roots_ok cenv fds G st tinfo rs vs ->
-       0 <= nalloc < 2 ^ 61 ->
+       0 <= nalloc <= Z.of_N LLVM_fragment.max_chunk ->
        (exists a, ptr_off tinfo off_nalloc a /\ reads_word st a nalloc) ->
        ends_in_oom (interp_mcfg (gc [Ptr tinfo]) (st, (ls, G)))
        \/ exists st',
@@ -1527,7 +1527,7 @@ Section Simulation.
   Lemma prog_constr x t ys e :
     subterm_or_eq (Econstr x t ys e) (Efun fds main) ->
     tag_ok cenv t /\ arity_of cenv t = N.of_nat (length ys) /\
-    8 * Z.of_N (chunk_words (Econstr x t ys e)) < 2 ^ 64.
+    (chunk_words (Econstr x t ys e) <= LLVM_fragment.max_chunk)%N.
   Proof.
     intros H. destruct (prog_body_ok _ H) as [E|Hb]; [discriminate|].
     inversion Hb; subst. auto.

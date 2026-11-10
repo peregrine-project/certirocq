@@ -23,6 +23,7 @@ From ExtLib Require Import Structures.Monads.
 From CertiRocq.LambdaANF Require Import term term_util eval identifiers.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten.
+From CertiRocq.CodegenLLVM Require LLVM_fragment.
 
 From Vellvm Require Import
   Utils Syntax Params
@@ -342,8 +343,8 @@ Section Runtime.
          root slots keep their Vellvm allocation ids (the generated code
          reloads them through its own [alloca]).  Nothing is said about the
          ids of heap bytes: a copying collector frees its from-space.
-         [nalloc] is bounded because the stored word only determines it
-         modulo 2^64; the generated code requests small constants. *)
+         [nalloc] is at most the nursery size [max_chunk]; [gc_stack.c]
+         exits on a larger request, and [body_ok] excludes one. *)
   Definition runtime_correct (gc : list dvalue -> MCFGtop (exc + dvalue))
              (make_tinfo : MCFGtop dvalue) : Prop :=
     (ends_in_oom (interp_mcfg make_tinfo initial_fused)
@@ -363,7 +364,7 @@ Section Runtime.
     (forall (genv : global_env) (tinfo : ptr) (st : state) ls fp rs vs nalloc,
        rt_ok st tinfo fp rs ->
        roots_ok cenv fds genv st tinfo rs vs ->
-       0 <= nalloc < 2 ^ 61 ->
+       0 <= nalloc <= Z.of_N LLVM_fragment.max_chunk ->
        (exists a, ptr_off tinfo off_nalloc a /\ reads_word st a nalloc) ->
        ends_in_oom (interp_mcfg (gc [DVALUE_Base (DVALUE_Pointer tinfo)]) (st, (ls, genv)))
        \/ exists st',
@@ -395,11 +396,11 @@ Definition tag_ok (cenv : ctor_env) (t : ctor_tag) : Prop :=
 (** No [Eprim], only integer primitive values, no nested [Efun]; constructor
     arities match, projections are in range, and every allocation chunk
     (the words the limit check at the head of a run of constructors asks
-    for) is below 2^64 bytes, as the check compares in 64-bit arithmetic. *)
+    for) fits in the nursery of [gc_stack.c]. *)
 Inductive body_ok (cenv : ctor_env) : term.exp -> Prop :=
 | BO_constr x t ys e :
     tag_ok cenv t -> arity_of cenv t = N.of_nat (length ys) ->
-    8 * Z.of_N (chunk_words (Econstr x t ys e)) < 2 ^ 64 ->
+    (chunk_words (Econstr x t ys e) <= LLVM_fragment.max_chunk)%N ->
     body_ok cenv e -> body_ok cenv (Econstr x t ys e)
 | BO_proj x t n y e :
     (n < arity_of cenv t)%N -> body_ok cenv e -> body_ok cenv (Eproj x t n y e)
