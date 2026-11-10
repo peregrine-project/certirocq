@@ -212,6 +212,9 @@ for t in "$@"; do
     src="$n.v"; lib=LLVMTests
   fi
   if ! rocq "$src" > "$B/$n.rocq.log" 2>&1; then
+    if [ $xfail -eq 1 ] && grep -q 'does not support this program' "$B/$n.rocq.log"; then
+      echo " rejected at compile time (XFAIL)"; continue
+    fi
     echo " ROCQ-FAIL (see _build/$n.rocq.log)"; FAILS=$((FAILS+1)); continue
   fi
   mv -f "$HERE/CertiRocq.$lib.$n.prog.ll" "$B/$n.ll"

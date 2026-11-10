@@ -32,15 +32,15 @@ unboxed word with a logical shift.
 | `c04_big_ctor.v` | arity-60 and arity-300 constructors; large Eproj offsets; one 61/301-word chunk each | `(C0 (C0 2 3) 1)` |
 | `c05_many_live.v` | 40 boxed variables live across a GC-heavy call (40-slot root frame), 234 times | `(C0 0 5)` |
 | `c06_mixed_ctors.v` | 12 nullary + 12 non-nullary interleaved ctors: Ecase boxed/unboxed switch, ordinals differ from indices | `(C0 (C0 (C0 1 (C11 4)) 3) (C2 (C0 2)))` |
-| `c07_ord_ge_251.v` | boxed ordinal 251/255 (allowed by `tag_ok`) live across GCs. **Expected to FAIL on gc_stack.c** (No_scan tag clash) | `(C0 (C0 (C0 5 1) 1) 1)` |
+| `c07_ord_ge_251.v` | boxed ordinal 251/255 (excluded by `tag_ok`) live across GCs. **Rejected at compile time**: `gc_stack.c` does not scan such objects (No_scan tag clash) | `(C0 (C0 (C0 5 1) 1) 1)` |
 | `c08_nested_match.v` | depth-8 nested patterns on 20000 inputs: Ecase/Eproj nesting | `2` |
 | `c09_mutual.v` | mutual inductive tree/forest (88573 nodes) + mutual even/odd on 100001. **~10^5 stack frames** | `(C0 (C0 (C0 2 3) 0) 1)` |
 | `c10_closures.v` | 20000 closures in a list across GCs, CPS fold, compose, partial application: code pointers in roots/fields | `(C0 (C0 (C0 3 4) 5) 1)` |
 | `c11_letapp_chains.v` | 30-call Eletapp chains, results dead at once vs. all live until the end | `(C0 (C0 (C0 1 1) 5) 0)` |
 | `c12_primint63.v` | non-allocating PrimInt63 ops incl. wrap-around, /0, shifts >= 63 (Eprim: outside the theorem) | 19-element list, see file |
-| `c13_primint63_alloc.v` | allocating prim `addc` in an allocating loop. **Expected to FAIL**: the emitter registers no roots around allocating prims (outside the theorem) | `(C0 (C0 1 9223372036854675808) 2)` |
+| `c13_primint63_alloc.v` | allocating prim `addc` in an allocating loop. **Rejected at compile time**: the emitter registers no roots around allocating prims (outside the theorem) | `(C0 (C0 1 9223372036854675808) 2)` |
 | `c14_chunk_large.v` | one 6000-word straight-line allocation chunk (2000 conses), GC with nalloc = 6000 | `5` |
-| `c15_chunk_over_nursery.v` | one 66000-word chunk, more than the 65536-word nursery. **Expected to FAIL on gc_stack.c** (`room`: it calls exit(1)) | `6` |
+| `c15_chunk_over_nursery.v` | one 66000-word chunk, more than the 65536-word nursery. **Rejected at compile time**: `gc_stack.c` calls exit(1) (`room`) | `6` |
 | `c16_sharing.v` | a DAG for a 2^60-leaf tree, live across ~50 GCs (sharing has to be preserved) | `(C0 (C0 (C0 4 4) 2) 0)` |
 
 c12's full EXPECTED: `(C0 0 (C0 9223372036853541241 (C0 9223372036854775806
@@ -71,11 +71,11 @@ its header and `tests/llvm/RESULTS.md`). By hand:
    exits with status 3. On a contract violation it prints
    `certirocq-contract: VIOLATION [<Rocq clause>] PRE|POST ...` and aborts
    (SIGABRT).
-5. Expected-failure tests: c07 (`roots_ok` violation mentioning
-   No_scan_tag), c13 (wrong result, crash, or a violation at a later GC) and
-   c15 (`room` violation). They are correct Rocq programs within (c07, c15)
-   or outside (c13) the theorem's hypotheses. When one of them passes, a
-   runtime or emitter bug has been fixed.
+5. Rejected programs: the backend refuses c07, c13 and c15 at compile time
+   (`buildable` in `theories/CodegenLLVM/LLVM_fragment.v`). `tests/llvm/run.sh`
+   reports the refusal as XFAIL. c07 and c13 are outside the theorem's
+   hypotheses; c15 is inside them, and the theorem allows the out-of-memory
+   outcome that `gc_stack.c` would give it.
 
 `runtime-smoke/run_smoke.sh` is a standalone test of the checker against the
 real collector, with no Rocq pipeline involved. It runs plain, under
