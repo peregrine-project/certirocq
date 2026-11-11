@@ -342,6 +342,7 @@ ShowAST :: plugin
 Traversal :: plugin
 Flatten :: plugin
 LambdaANF_to_LLVM :: plugin
+LLVM_fragment :: plugin
 Serialize :: plugin
 Toplevel2 :: plugin
 Glue_utils

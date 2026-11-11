@@ -110,6 +110,7 @@ CodegenWasm/toplevel_theorem.v
 CodegenLLVM/Flatten.v
 CodegenLLVM/LambdaANF_to_LLVM.v
 CodegenLLVM/Serialize.v
+CodegenLLVM/LLVM_fragment.v
 CodegenLLVM/toplevel.v
 # CodegenLLVM — correctness statement against Vellvm's semantics, and its proof
 # (see LLVM_PROOF.md at the repository root)
@@ -130,6 +131,7 @@ CodegenLLVM/LLVM_sim_cases_read.v
 CodegenLLVM/LLVM_sim_cases_constr.v
 CodegenLLVM/LLVM_sim_cases_call.v
 CodegenLLVM/LLVM_sim_exp.v
+CodegenLLVM/LLVM_restricted_check.v
 CodegenLLVM/LLVM_nonvacuity.v
 CodegenLLVM/LLVM_nonvacuity_run.v
 
