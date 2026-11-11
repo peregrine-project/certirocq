@@ -40,7 +40,7 @@ int is_ptr(value x) {
     return test_int_or_ptr(x) == 0;
 }
 
-/* A "space" describes one generation of the generational collector. 
+/* A "space" describes one generation of the generational collector.
 struct space {
   value *start, *next, *limit, *rem_limit;
   };*/
@@ -53,7 +53,7 @@ struct space {
 /*  Using RATIO=2 is faster than larger ratios, empirically */
 #endif
 
-/* Rationale for LOG_NURSERY_SIZE = 16:  
+/* Rationale for LOG_NURSERY_SIZE = 16:
    The size of generation 0 (the "nursery") should approximately match the
    size of the level-2 cache of the machine, according to:
       Cache Performance of Fast-Allocating Programs,
@@ -75,22 +75,26 @@ struct space {
 */
 
 
-/* The definition of MAX_SPACES allows the largest generation to be as big 
-   as half the entire address space.
-   Here's the math: 8*sizeof(value) is the number of bits per word.
+/* MAX_SPACES is the largest generation count, with RATIO=2, for which
+   every within-generation byte difference fits in a signed pointer offset.
+   Write W = 8*sizeof(value) for the number of bits per word.
    Counting the nursery as generation 0, the largest generation is MAX_SPACES-1,
    and generation i+1 is twice as big as generation i.
-   Therefore the number of bytes in the largest generation is,
-      WORDSIZE*2^(MAX_SPACES-1)*NURSERY_SIZE
-   = 2^(LOG_WORDSIZE + MAX_SPACES-1 + LOG_NURSERY_SIZE)
-   = 2^(LOG_WORDSIZE + 8*WORDSIZE - (2+LOG_WORDDSIZE+LOG_NURSERY_SIZE) + LOG_NURSERY_SIZE)
-   = 2^(8*WORDSIZE - 2)
-   On a 64-bit machine this is 2^(64-2) = 2^62;  on a 32-bit machine it is 4*2^26 = 2^30.
+   Therefore the number of bytes in the largest generation is
+      sizeof(value)*2^(MAX_SPACES-1)*NURSERY_SIZE
+   = 2^(LOG_WORDSIZE + MAX_SPACES - 1 + LOG_NURSERY_SIZE)
+   = 2^(LOG_WORDSIZE + W - (1+LOG_WORDSIZE+LOG_NURSERY_SIZE) - 1 + LOG_NURSERY_SIZE)
+   = 2^(W - 2).
+   This is 2^62 bytes on a 64-bit machine and 2^30 bytes on a 32-bit machine,
+   in both cases below the maximum signed pointer offset, 2^(W-1)-1.
 
-   On a 32-bit machine, that's actually a problem!  We would like the largest generation
-   to be as big as 2^31, so the sum of all the generations could approach 2^32, and we use
-   the entire address space.  To make that work, we would have to reason more carefully
-   about pointer subtractions; see NOTE-POINTER-ARITH below.  This could probably be done.
+   Removing the 1 in MAX_SPACES would allow a generation of 2^(W-1) bytes.
+   CompCert pointer subtraction uses a signed byte difference before dividing
+   by sizeof(value), so limit-next for an empty generation of that size would
+   be negative.  In particular, forward_remset tests this difference before
+   copying into a newly created generation.  Supporting that extra generation
+   requires changing the pointer arithmetic and its proofs; see
+   NOTE-POINTER-ARITH below.
 */
 
 #ifndef DEPTH
@@ -218,19 +222,14 @@ void forward_remset (struct space *from,  /* descriptor of from-space */
                      struct space *to,    /* descriptor of to-space */
                      value **next)        /* next available spot in to-space */
 {
-  value *from_start = from->start, *from_limit=from->limit, *from_rem_limit=from->rem_limit;
-  value *q = from_limit;
-  assert (from_rem_limit-from_limit <= to->limit-to->start);
-  while (q != from_rem_limit) {
-    value *p = *(value**)q;
-    if (!(from_start <= p && p < from_limit)) {
-      value oldp= *p, newp;
+  value *from_start = from->start, *from_limit=from->limit, *from_rem_limit=from->rem_limit, *q;
+  assert (from_rem_limit-from_limit <= to->limit-to->next);
+  for (q = from_limit; q != from_rem_limit; q++) {
+    value *p = (value*)int_or_ptr_to_ptr(*q);
+    if (!Is_from(from_start, from_limit, p)) {
       forward(from_start, from_limit, next, p, DEPTH);
-      newp= *p;
-      if (oldp!=newp)
-          *(--to->limit) = (value)p;
+      *(--to->limit) = (value)p;
     }
-    q++;
   }
 }
 
@@ -362,7 +361,7 @@ struct thread_info *make_tinfo(void) {
   struct thread_info *tinfo;
   h = create_heap();
   tinfo = (struct thread_info *)malloc(sizeof(struct thread_info));
-  if (!tinfo) 
+  if (!tinfo)
     abort_with("Could not allocate thread_info struct\n");
 
   tinfo->heap=h;
@@ -491,7 +490,7 @@ void *export_heap(struct thread_info *ti, value root) {
   frame.next=roots+1;
   frame.prev=NULL;
   ti->fp= &frame;
-  
+
   /* if root is unboxed, return it */
   if(!is_ptr(root))
     return (void *)root;
@@ -519,7 +518,7 @@ void *export_heap(struct thread_info *ti, value root) {
 }
 
 /* mutable write barrier */
-void certirocq_modify(struct thread_info *ti, value *p_cell, value p_val) {
+void mutable_update(struct thread_info *ti, value *p_cell, value p_val) {
   assert (ti->alloc < ti->limit);
   *p_cell = p_val;
   if (is_ptr(p_val)) {
@@ -546,22 +545,6 @@ void print_heapsize(struct thread_info *ti) {
  When p and q have type  *foo,  then this is much like  ((int)p-(int)q)/sizeof(foo).
  But note this is a SIGNED division, which makes it quite dangerous if ((int)p-(int)q)
  can be larger than the maximum signed integer.  So we have to be quite careful in
- the program and the proof, especially when (on a 32-bit machines) our largest generation 
- might be similar in size to the entire address space. 
+ the program and the proof, especially when (on a 32-bit machines) our largest generation
+ might be similar in size to the entire address space.
 */
-
-struct closure {
-  value (*func)(struct thread_info *, value, value);
-  value env;
-};
-
-value closure_call(struct thread_info *$tinfo, value $clo, value $arg)
-{
-  register value (*$f)(struct thread_info*, value, value);
-  register value $envi;
-  register value $tmp;
-  $f = (*((struct closure *) $clo)).func;
-  $envi = (*((struct closure *) $clo)).env;
-  $tmp = $f($tinfo, $envi, $arg);
-  return $tmp;
-}
