@@ -1182,7 +1182,7 @@ Section Constr.
        field st tinfo off_fp fp ->
        shadow_stack st fp rs ->
        roots_ok cenv fds G st tinfo rs vs ->
-       0 <= nalloc < 2 ^ 61 ->
+       0 <= nalloc <= Z.of_N LLVM_fragment.max_chunk ->
        (exists a, ptr_off tinfo off_nalloc a /\ reads_word st a nalloc) ->
        ends_in_oom (interp_mcfg (gc [Ptr tinfo]) (st, (ls, G)))
        \/ exists st',
@@ -1231,7 +1231,16 @@ Section Constr.
   Proof.
     intros Hs Hne. destruct (LLVM_sim.prog_constr _ _ _ Hprog _ _ _ _ Hs) as (_ & _ & H).
     destruct ys as [|y ys0]; [congruence|].
-    cbn [chunk_words] in H. unfold hd_nwords. exact H.
+    cbn [chunk_words] in H. unfold hd_nwords. unfold LLVM_fragment.max_chunk in H. lia.
+  Qed.
+
+  Lemma prog_chunk_max x t ys e' :
+    subterm_or_eq (Econstr x t ys e') (Efun fds main) -> ys <> [] ->
+    Z.of_N (hd_nwords ys + chunk_words e') <= Z.of_N LLVM_fragment.max_chunk.
+  Proof.
+    intros Hs Hne. destruct (LLVM_sim.prog_constr _ _ _ Hprog _ _ _ _ Hs) as (_ & _ & H).
+    destruct ys as [|y ys0]; [congruence|].
+    cbn [chunk_words] in H. unfold hd_nwords. lia.
   Qed.
 
   Lemma constr_not_fun x t ys e :
@@ -2305,7 +2314,7 @@ Section Constr.
     LLVM_sim.frame_fields st6 f e s fp -> slots_from st6 s e rs1 ->
     length rs1 = length roots -> length vs1 = length roots ->
     (forall i r, nth_error rs1 i = Some r -> ptr_to_int r = ptr_to_int pR + 8 * Z.of_nat i) ->
-    Z.of_nat cwz < 2 ^ 61 ->
+    Z.of_nat cwz <= Z.of_N LLVM_fragment.max_chunk ->
     (exists aN, ptr_off tinfo off_nalloc aN /\ reads_word st6 aN (Z.of_nat cwz)) ->
     (forall b, ptr_to_int pR <= b < ptr_to_int pR + 8 * Z.of_nat (length roots) ->
        exists aid, aid_at st6 b = Some aid /\ access_allowed (ptr_provenance pR) aid = true) ->
@@ -2494,7 +2503,7 @@ Section Constr.
     set (sf10 := upd_local_sf sf (Maps.add (ssname fresh 10) (Ptr fp) (stack_vars sf))).
     refine (gc_reload_fgoal va _ c_g fresh roots st6 f e s rs1 sf10 stk fp rs vsr vs1 pR (N.to_nat cw) [] _ _
               (sim_result_closed _ _ _ _ _ _) (sim_result_oom _ _ _ _ _ _) HI6 Hff Hsl L1 Lr Hn1 _ HaN _ BR _ _ _ _).
-    - pose proof (prog_chunk_small x t ys e' Hsub Hne) as Hc8. fold cw in Hc8. rewrite N_nat_Z. lia.
+    - pose proof (prog_chunk_max x t ys e' Hsub Hne) as Hc8. fold cw in Hc8. rewrite N_nat_Z. exact Hc8.
     - intros b Hb. destruct (ACR b ltac:(lia)) as (aid & Ha1 & Hacc). exists aid. split; [|exact Hacc].
       rewrite Aid62. unfold aid_at in Ha1 |- *.
       rewrite (LLVM_instr_lemmas.alloc_post_allocated _ _ _ _ _ AP2); [exact Ha1|].

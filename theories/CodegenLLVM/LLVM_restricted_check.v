@@ -38,7 +38,7 @@ Proof.
     apply BO_constr; auto using tag_okb_sound.
     assert (E : chunk_words (Econstr v t l e) = constr_chunk l (snd (fragment cenv e)))
       by (rewrite fragment_chunk; destruct l; reflexivity).
-    rewrite E. unfold max_chunk in *. lia.
+    rewrite E. assumption.
   - apply BO_case. constructor.
   - apply andb_true_iff in H as [H Hgo]. apply andb_true_iff in H as [Ht He].
     assert (B : body_ok cenv (Ecase v l)) by (apply IHe0; exact Hgo).

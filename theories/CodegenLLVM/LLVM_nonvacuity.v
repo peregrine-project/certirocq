@@ -664,7 +664,8 @@ Proof.
   - intros. exact I.
   - intros genv tinfo st ls fp rs vs nalloc Hok_rt Hroots Hn Hna.
     pose proof Hok_rt as (_ & Hok & _).
-    destruct (nv_gc_check_run tinfo st (ls, genv) nalloc Hok Hn Hna) as [Ho|(Hr & Hroom)];
+    assert (Hn' : 0 <= nalloc < 2 ^ 61) by (unfold LLVM_fragment.max_chunk in Hn; lia).
+    destruct (nv_gc_check_run tinfo st (ls, genv) nalloc Hok Hn' Hna) as [Ho|(Hr & Hroom)];
       [left; exact Ho|right].
     exists st. split; [exact Hr|]. split; [exact Hok_rt|]. split; [exact Hroots|].
     split; [exact Hroom|]. split; [reflexivity|]. split; [intros; reflexivity|].

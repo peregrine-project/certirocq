@@ -19,7 +19,7 @@ Definition arity_of (cenv : ctor_env) (t : ctor_tag) : N :=
   match M.get t cenv with Some info => ctor_arity info | None => 0%N end.
 
 (** [fragment] decides the conditions on a function body of [body_ok] in
-    [LambdaANF_to_LLVM_statement.v], with a stronger bound on allocation chunks;
+    [LambdaANF_to_LLVM_statement.v];
     [LLVM_restricted_check.v] proves it sound.  [buildable] is weaker: it holds
     of every program outside the following three known failures, which it
     turns into compile-time errors.

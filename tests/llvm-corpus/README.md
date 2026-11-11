@@ -73,9 +73,8 @@ its header and `tests/llvm/RESULTS.md`). By hand:
    (SIGABRT).
 5. Rejected programs: the backend refuses c07, c13 and c15 at compile time
    (`buildable` in `theories/CodegenLLVM/LLVM_fragment.v`). `tests/llvm/run.sh`
-   reports the refusal as XFAIL. c07 and c13 are outside the theorem's
-   hypotheses; c15 is inside them, and the theorem allows the out-of-memory
-   outcome that `gc_stack.c` would give it.
+   reports the refusal as XFAIL. All three are outside the theorem's
+   hypotheses.
 
 `runtime-smoke/run_smoke.sh` is a standalone test of the checker against the
 real collector, with no Rocq pipeline involved. It runs plain, under

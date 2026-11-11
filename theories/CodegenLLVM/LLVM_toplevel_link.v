@@ -897,7 +897,7 @@ Definition gc_contract (cenv : ctor_env) (fds : fundefs) (heap_inv : state -> pt
     field st tinfo off_fp fp ->
     shadow_stack st fp rs ->
     roots_ok cenv fds G st tinfo rs vs ->
-    0 <= nalloc < 2 ^ 61 ->
+    0 <= nalloc <= Z.of_N LLVM_fragment.max_chunk ->
     (exists a, ptr_off tinfo off_nalloc a /\ reads_word st a nalloc) ->
     ends_in_oom (interp_mcfg (gc [Ptr tinfo]) (st, (ls, G)))
     \/ exists st',
@@ -972,7 +972,7 @@ Definition sim_exp_statement : Prop :=
      field st tinfo off_fp fp ->
      shadow_stack st fp rs ->
      roots_ok cenv fds G st tinfo rs vs ->
-     0 <= nalloc < 2 ^ 61 ->
+     0 <= nalloc <= Z.of_N LLVM_fragment.max_chunk ->
      (exists a, ptr_off tinfo off_nalloc a /\ reads_word st a nalloc) ->
      ends_in_oom (interp_mcfg (gc [Ptr tinfo]) (st, (ls, G)))
      \/ exists st',
