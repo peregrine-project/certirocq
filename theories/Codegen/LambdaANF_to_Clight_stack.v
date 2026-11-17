@@ -242,7 +242,7 @@ Fixpoint max_allocs (e : exp) : nat :=
   | Econstr x t vs e' =>
     match vs with
     | nil => max_allocs e'
-    | _ => S (max_allocs e' + length vs)
+    | _ => S (length vs + max_allocs e') (* [Nat.add] recurses on its first argument *)
     end
   | Ecase x cs =>
     (fix helper (cs : list (ctor_tag * exp)) :=

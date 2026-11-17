@@ -74,14 +74,27 @@ Section Inline.
     log_msg (pp_St s nenv);;
     log_msg Pipeline_utils.newline.
 
+  (* Fuel split at an inlined [Eletapp]: [j1] for the inlined body, [j2] for
+     the continuation, with [j1 + j2 = d] (the step-index budget of
+     [inline_correct]). The body gets half of the fuel, but at most
+     [inline_body_fuel]; the continuation keeps the rest. Halving the fuel of
+     the continuation at every inlined call would allow only about
+     [log2 d] inlined calls along a chain of [Eletapp]s per round of
+     [inline_loop], so a long chain needed one full inline+shrink round per
+     handful of calls (quadratic in the chain length). The body is small
+     (below the inlining bound), so it needs little fuel; for [d <= 17] the
+     split is the same as halving. *)
+  Definition inline_body_fuel : nat := 8.
+
   Definition split_fuel d : nat * nat :=
-    let d2 := Nat.div2 d in
-    (d2, d2 + Nat.b2n (Nat.odd d)).
+    let d1 := Nat.min (Nat.div2 d) inline_body_fuel in
+    (d1, d - d1).
 
   Lemma split_fuel_add d :
     d = fst (split_fuel d) + snd (split_fuel d).
   Proof.
-    unfold split_fuel. simpl. rewrite (Nat.div2_odd d) at 1. simpl.
+    unfold split_fuel. simpl.
+    assert (Nat.div2 d <= d) by (rewrite (Nat.div2_odd d) at 2; lia).
     lia.
   Qed.
 
