@@ -1581,7 +1581,7 @@ Section Inline_correct.
           { edestruct Hfm. eassumption. destructAll. eapply bind_triple.
             - do 2 eapply frame_rule. eapply pre_transfer_r. eapply IHd.
               + lia.
-              + eapply Nat.le_trans. reflexivity.
+              + eapply Nat.le_trans. eapply Nat.le_min_l.
                 eapply Nat.div2_decr. lia.
               + eassumption.
               + eapply Union_Disjoint_r. clear H3. now sets. now sets.

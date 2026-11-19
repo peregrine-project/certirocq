@@ -183,13 +183,20 @@ Section IDENT.
 
     (* Optimizing λANF pipeline *)
 
+    (* Inlining fuel per round of [inline_shrink_loop]: the number of calls
+       that can be inlined along one chain of [Eletapp]s in one round (see
+       [split_fuel]). Every round is a full inline+shrink pass over the
+       program, so a small fuel makes long chains cost a quadratic number of
+       passes. *)
+    Definition inline_loop_fuel : nat := 50 * 100.
+
     Definition anf_pipeline (e : exp) : anf_state exp :=
       e <- time_anf "Tail calls" tail_letapp_trans e;;
       e <- time_anf "Shrink" shrink_err e;;
       e <- time_anf "Uncurry" (uncurry_top (cps anf_opts)) e ;;
       e <- time_anf "Inline uncurry wrappers" (inline_uncurry next_var 10 100) e ;;
       e <- (if inl_before anf_opts then
-              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
+              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 inline_loop_fuel) e
             else id_trans e) ;;
       e <- (if (do_lambda_lift anf_opts) then
               time_anf "Lambda lift" (lambda_lift (args anf_opts) (no_push anf_opts) (inl_wrappers anf_opts)) e
@@ -198,7 +205,7 @@ Section IDENT.
       e <- time_anf "Closure conversion and hoisting" (closure_conversion_hoist clo_tag clo_ind_tag) e ;;
       e <- time_anf "Shrink" shrink_err e;;
       e <- (if inl_after anf_opts then
-              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
+              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 inline_loop_fuel) e
             else id_trans e) ;;
       e <- (if dpe anf_opts then
               time_anf "Dead param elim" dead_param_elim.DPE e
