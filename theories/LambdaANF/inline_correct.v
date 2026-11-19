@@ -2505,7 +2505,7 @@ Section Inline_correct.
 
     destruct p. destruct i. do 3 eexists.
     split; [| split; [| split; [| split; [| split ]]]].
-    - match goal with |- context [runState tt ?S] => pose proof (Hstate : runState tt S = _) as Hs'; rewrite Hs' end. reflexivity.
+    - reflexivity.
     - eassumption.
     - eapply Included_trans. eassumption. rewrite apply_r_empty_f_eq. rewrite image_id, occurs_free_fun_map_empty.
       sets.
