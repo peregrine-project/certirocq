@@ -182,7 +182,10 @@ Section Shrink_correct.
     - intros; eapply Hless_steps_ctx; eauto.
     - simpl. eapply HPost_OOT.
     - reflexivity.
-    - intros. inv H.
+    - intros. inv H. match goal with Hc : ctx_to_rho Hole_c _ _ |- _ => inv Hc end.
+      eapply preord_exp_refl; eauto.
+      eapply preord_env_P_set_not_in_P_l in Henv; eauto with Ensembles_DB.
+      rewrite Setminus_Disjoint in Henv. eauto. eauto with Ensembles_DB.
   Qed.
 
   Lemma rm_prim_val k rho rho' e x p :
