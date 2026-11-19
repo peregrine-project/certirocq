@@ -23,12 +23,6 @@ Definition state := (env * exp)%type.
 (** Primitive functions map. *)
 Definition prims := M.t (list val -> option val).
 
-(** The primitive environment of the fuel semantics [bstep_fuel]. It is an
-    instance argument, so that the statements over [bstep_fuel] keep their
-    form. It carries the condition [prims_first_order] under which the
-    passes preserve primitive applications. A section that reasons about [bstep_fuel] declares
-    [Context {HPE : PrimEnv}]. [empty_prim_env] gives the semantics without
-    primitives (see [bstep_fuel_empty_iff]). *)
 (** First-order values: no closures. *)
 Inductive fo_val : val -> Prop :=
 | fo_Vconstr : forall t vs, Forall fo_val vs -> fo_val (Vconstr t vs)
@@ -60,6 +54,12 @@ Definition prims_first_order (pr : prims) : Prop :=
     f' vs = Some v ->
     Forall fo_val vs /\ fo_val v.
 
+(** The primitive environment of the fuel semantics [bstep_fuel]. It is an
+    instance argument, so that the statements over [bstep_fuel] keep their
+    form; a section that reasons about [bstep_fuel] declares
+    [Context {HPE : PrimEnv}]. It carries the condition [prims_first_order],
+    under which the passes preserve primitive applications. [empty_prim_env]
+    gives the semantics without primitives ([bstep_fuel_empty_iff]). *)
 Class PrimEnv :=
   { prim_funs : prims;
     prim_funs_first_order : prims_first_order prim_funs }.
