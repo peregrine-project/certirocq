@@ -22,6 +22,7 @@ Close Scope Z_scope.
 Section ToplevelTheorems.
 
   Context (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
   Context (clo_tag : ctor_tag).
   Context (clo_itag : ind_tag).
 
@@ -150,7 +151,7 @@ Section LambdaLift.
                                            (PG := ll_bound 0).
     - intros. eapply ll_bound_compat.
     - intros. eapply ll_bound_compat.
-      exact (M.empty _). exact 0%nat.
+      all: first [ exact HPE | exact (M.empty _) | exact 0%nat ].
     - eapply ll_bound_mon. lia.
     - intros. eapply ll_bound_local_steps; eauto.
     - intros. eapply ll_bound_local_app.
@@ -475,6 +476,7 @@ Import MonadNotation.
 Section Compose.
 
   Context (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   Transparent bind.
 
@@ -795,6 +797,100 @@ Section Compose.
 
 
 End Compose.
+
+(** * The pipeline for [bstep_e] with primitives
+
+    [bstep_e pr] (cost semantics with a primitive environment [pr], rule
+    [BStep_prim]) and [bstep_fuel] with the instance [prim_env_of pr Hfo] agree
+    on terminating runs. Through them the whole-program theorem holds for
+    [bstep_e pr], for every primitive environment [pr] that satisfies
+    [prims_first_order]. *)
+
+Lemma findtag_find_tag_nth (cl : list (ctor_tag * exp)) t e :
+  findtag cl t = Some e -> exists n, find_tag_nth cl t e n.
+Proof.
+  induction cl as [| [c e'] cl IH]; simpl; [discriminate |].
+  destruct (M.elt_eq c t) as [-> | Hne]; intros H.
+  - inversion H; subst. exists 1%nat. constructor.
+  - destruct (IH H) as [n Hn]. exists (n + 1)%nat. constructor; auto.
+Qed.
+
+Lemma find_tag_nth_findtag (cl : list (ctor_tag * exp)) t e n :
+  find_tag_nth cl t e n -> findtag cl t = Some e.
+Proof.
+  induction 1; simpl.
+  - destruct (M.elt_eq c c); congruence.
+  - destruct (M.elt_eq c c'); congruence.
+Qed.
+
+Definition prim_env_of (pr : prims) (Hfo : prims_first_order pr) : PrimEnv :=
+  {| prim_funs := pr; prim_funs_first_order := Hfo |}.
+
+Section BstepE.
+
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+  Context (cenv : ctor_env).
+  Context (HPE : PrimEnv).
+
+  Local Arguments bstep_fuel_ind' : clear implicits.
+
+  Lemma bstep_e_bstep_fuel rho e v n :
+    bstep_e (@prim_funs HPE) cenv rho e v n ->
+    exists (c : fuel) (t : trace), @bstep_fuel HPE cenv fuel Hf trace Ht rho e c (Res v) t.
+  Proof.
+    induction 1;
+      repeat match goal with
+             | H : exists _ _, _ |- _ => destruct H as (? & ? & ?)
+             end;
+      try (do 2 eexists; econstructor; econstructor; eauto; fail).
+    match goal with H : findtag _ _ = Some _ |- _ => destruct (findtag_find_tag_nth _ _ _ H) as [m Hm] end.
+    do 2 eexists; econstructor; econstructor; eauto.
+  Qed.
+
+  Lemma bstep_fuel_bstep_e rho e (c : fuel) v (t : trace) :
+    @bstep_fuel HPE cenv fuel Hf trace Ht rho e c (Res v) t ->
+    exists n, bstep_e (@prim_funs HPE) cenv rho e v n.
+  Proof.
+    intros H. remember (Res v) as r eqn:Er. revert v Er.
+    induction H using bstep_fuel_ind' with
+      (P := fun rho e c r t => forall v, r = Res v -> exists n, bstep_e (@prim_funs HPE) cenv rho e v n);
+      intros; subst;
+      repeat match goal with
+             | H : forall v, Res ?w = Res v -> _ |- _ => specialize (H w eq_refl); destruct H
+             | H : forall v, ?r = Res v -> _ |- _ => specialize (H _ eq_refl); destruct H
+             end;
+      try discriminate;
+      try (eexists; econstructor; eauto; fail).
+    - eexists; econstructor; eauto. eapply find_tag_nth_findtag; eauto.
+    - match goal with H : Res _ = Res _ |- _ => inversion H; subst end.
+      eexists; econstructor; eauto.
+    - eauto.
+  Qed.
+
+End BstepE.
+
+(** The whole-program theorem for [bstep_e] with a primitive environment [pr]
+    that satisfies [prims_first_order]. Its statement is the hypothesis
+    [H_pipeline_prims pr cenv] of peregrine-tool's [lambdapure/Compose.v],
+    with the condition [prims_first_order pr]. *)
+Theorem anf_pipeline_bstep_e_correct (pr : prims) (Hfo : prims_first_order pr)
+        (cenv : ctor_env) var opts e c e' c' :
+  closed_exp e -> well_scoped e -> (max_var e 1 < next_var c)%positive ->
+  anf_pipeline var opts e c = (compM.Ret e', c') ->
+  forall v n, bstep_e pr cenv (M.empty _) e v n ->
+  exists v' n', bstep_e pr cenv (M.empty _) e' v' n' /\ value_ref_cc v v'.
+Proof.
+  intros Hcl Hws Hmax Hp v n Hb.
+  pose (HPE := prim_env_of pr Hfo).
+  destruct (anf_pipeline_whole_program_correct (HPE := HPE) cenv var opts e c Hcl Hws Hmax)
+    as (e'' & c'' & Hp' & Hterm & _).
+  rewrite Hp in Hp'. inversion Hp'; subst; clear Hp'.
+  destruct (bstep_e_bstep_fuel (fuel := nat) (trace := nat * nat) cenv HPE _ _ _ _ Hb)
+    as (cin & t & Hf).
+  destruct (Hterm _ _ _ Hf) as (v2 & c2 & t2 & Hf2 & Hr).
+  destruct (bstep_fuel_bstep_e cenv HPE _ _ _ _ _ Hf2) as [n' Hb'].
+  exists v2, n'. auto.
+Qed.
 
 (* Print Assumptions anf_pipeline_whole_program_correct. *)
 (* Print Assumptions anf_pipeline_linking_correct. *)

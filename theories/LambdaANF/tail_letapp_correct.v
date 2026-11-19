@@ -16,6 +16,7 @@ Import ListNotations.
 Section TailLetapp.
 
   Context (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   Local Notation PG := (inline_bound 1 1).
 
@@ -127,22 +128,26 @@ Section TailLetapp.
   (** The last step of a terminating evaluation is an [Ehalt], which costs [(1, 0)]:
       with one unit of fuel less, the same term runs out of fuel with the trace
       minus that [Ehalt]. *)
+  (* [induction ... using] counts the parameters of the scheme: keep the
+     instance argument explicit. *)
+  Local Arguments bstep_fuel_ind' : clear implicits.
+
   Lemma bstep_fuel_Res_OOT_pred rho e c v cout :
-    @bstep_fuel cenv nat fuel_res (nat * nat) trace_res rho e c (Res v) cout ->
+    @bstep_fuel _ cenv nat fuel_res (nat * nat) trace_res rho e c (Res v) cout ->
     exists c' cout',
-      @bstep_fuel cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
+      @bstep_fuel _ cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
       c = c' + 1 /\ cout = (fst cout' + 1, snd cout').
   Proof.
     set (P := fun rho e (c : nat) (r : @res val) (cout : nat * nat) =>
                 forall v, r = Res v ->
                           (c = 0 /\ cout = (0, 0) /\ exists x, e = Ehalt x) \/
                           (exists c' cout',
-                              @bstep cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
+                              @bstep _ cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
                               c = c' + 1 /\ cout = (fst cout' + 1, snd cout'))).
     set (P0 := fun rho e (c : nat) (r : @res val) (cout : nat * nat) =>
                  forall v, r = Res v ->
                            exists c' cout',
-                             @bstep_fuel cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
+                             @bstep_fuel _ cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
                              c = c' + 1 /\ cout = (fst cout' + 1, snd cout')).
     intros Hstep.
     assert (Hs : P0 rho e c (Res v) cout).
@@ -339,8 +344,14 @@ Section TailLetapp.
       eapply preord_env_P_monotonic; [| eassumption ]. lia.
       now (normalize_occurs_free; eauto with Ensembles_DB).
       rewrite preord_val_eq; eauto. reflexivity.
-    - eapply preord_exp_prim_compat; eauto; intros.
+    - eapply preord_exp_prim_compat; eauto.
       eapply Forall2_same. intros. apply Henv. now constructor.
+      intros m v1 v2 Hlt Hval. apply IHe; try eassumption.
+      intros. eapply IH; eauto. lia.
+      eapply preord_env_P_extend; eauto.
+      eapply preord_env_P_antimon.
+      eapply preord_env_P_monotonic; [| eassumption ]. lia.
+      now (normalize_occurs_free; eauto with Ensembles_DB).
     - eapply preord_exp_halt_compat; try eassumption. now eauto. now eauto.
       intros x HP. apply Henv; eauto.
   Qed.

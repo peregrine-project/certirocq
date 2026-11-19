@@ -24,6 +24,7 @@ Section CC_correct.
   Variable (env0_tag : ctor_tag).
   Variable (pr : prims).
   Variable (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   (** Free variable map invariant *)
   Definition FVmap_inv (FVmap : VarInfoMap) Scope Funs GFuns FVs : Prop :=

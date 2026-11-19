@@ -491,6 +491,7 @@ Section Correct.
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 
   Variable cenv : ctor_env.
+  Context {HPE : PrimEnv}.
 
   Context (PL : @PostT fuel trace) (* Local *)
           (PG : @PostGT fuel trace).  (* Global *)
@@ -972,8 +973,18 @@ Section Correct.
     - (* Eprim *)
       eapply preord_exp_prim_compat.
       + eapply HPost.
+      + eapply HPost.
       + rewrite <- (map_id l) at 2. eapply Forall2_preord_var_env_map. now eauto.
         normalize_occurs_free. sets.
+      + intros. eapply IHk; eauto.
+        * repeat normalize_bound_var_in_ctx. sets.
+        * eapply fun_inv_set_Disjoint. eapply fun_inv_monotonic; eauto. lia.
+          repeat normalize_occurs_free_in_ctx. sets.
+        * eapply preord_env_P_extend.
+          eapply preord_env_P_antimon.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
+          normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
+          eassumption.
 
     - (* Ehalt *)
       eapply preord_exp_halt_compat.

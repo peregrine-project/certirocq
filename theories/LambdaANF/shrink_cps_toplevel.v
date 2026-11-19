@@ -10,6 +10,7 @@ Section Srink_top_correct.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
+  Context {HPE : PrimEnv}.
 
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 

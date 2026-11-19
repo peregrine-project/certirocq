@@ -95,6 +95,7 @@ Section Bounds.
         t2 + tapp2 = c2.
 
     Context (cenv : ctor_env).
+    Context {HPE : PrimEnv}.
 
     Instance inline_bound_compat L G (Hi : L <= G) :
       Post_properties cenv (inline_bound L G) (inline_bound L G) (inline_bound G G).
@@ -215,6 +216,7 @@ Section Bounds.
   Section SimpleBound.
 
     Context (cenv : ctor_env).
+    Context {HPE : PrimEnv}.
 
     (* Simple bound for transformations that don't decrease steps *)
     Definition simple_bound (L : nat) : @PostT nat (nat * nat) :=
@@ -346,6 +348,7 @@ Section Bounds.
   Section HoistingBound.
 
     Context (cenv : ctor_env).
+    Context {HPE : PrimEnv}.
 
     Definition hoisting_bound (L G : nat) : @PostT nat (nat * nat) :=
       fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
@@ -412,6 +415,7 @@ Section Bounds.
     Definition ll_bound (l : nat) := simple_bound 0.
 
     Context (cenv : ctor_env).
+    Context {HPE : PrimEnv}.
 
     Instance ll_bound_compat k m n :
       Post_properties cenv (ll_bound k) (ll_bound m) (ll_bound n).

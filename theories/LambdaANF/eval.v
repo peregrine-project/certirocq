@@ -23,9 +23,66 @@ Definition state := (env * exp)%type.
 (** Primitive functions map. *)
 Definition prims := M.t (list val -> option val).
 
+(** First-order values: no closures. *)
+Inductive fo_val : val -> Prop :=
+| fo_Vconstr : forall t vs, Forall fo_val vs -> fo_val (Vconstr t vs)
+| fo_Vint : forall n, fo_val (Vint n)
+| fo_Vprim : forall p, fo_val (Vprim p).
+
+Lemma fo_val_ind_strong (P : val -> Prop) :
+  (forall t vs, Forall fo_val vs -> Forall P vs -> P (Vconstr t vs)) ->
+  (forall n, P (Vint n)) ->
+  (forall p, P (Vprim p)) ->
+  forall v, fo_val v -> P v.
+Proof.
+  intros H1 H2 H3. fix IH 2. intros v Hv. destruct Hv as [t vs Hvs | n | p].
+  - apply H1; [ exact Hvs | ].
+    revert vs Hvs. fix IHl 2. intros vs Hvs. destruct Hvs as [ | v vs Hv Hvs ].
+    + constructor.
+    + constructor; [ apply IH; exact Hv | apply IHl; exact Hvs ].
+  - apply H2.
+  - apply H3.
+Qed.
+
+(** The condition on the primitive environment: a primitive function succeeds
+    only on first-order arguments, and returns a first-order value. Closures
+    change representation under closure conversion; a primitive that inspects
+    them would not be preserved. *)
+Definition prims_first_order (pr : prims) : Prop :=
+  forall f f' vs v,
+    M.get f pr = Some f' ->
+    f' vs = Some v ->
+    Forall fo_val vs /\ fo_val v.
+
+(** The primitive environment of the fuel semantics [bstep_fuel]. It is an
+    instance argument, so that the statements over [bstep_fuel] keep their
+    form; a section that reasons about [bstep_fuel] declares
+    [Context {HPE : PrimEnv}]. It carries the condition [prims_first_order],
+    under which the passes preserve primitive applications. [empty_prim_env]
+    gives the semantics without primitives ([bstep_fuel_empty_iff]). *)
+Class PrimEnv :=
+  { prim_funs : prims;
+    prim_funs_first_order : prims_first_order prim_funs }.
+
+Lemma prims_first_order_empty : prims_first_order (M.empty _).
+Proof.
+  intros f f' vs v Hget. rewrite M.gempty in Hget. discriminate.
+Qed.
+
+Definition empty_prim_env : PrimEnv :=
+  {| prim_funs := M.empty _; prim_funs_first_order := prims_first_order_empty |}.
+
+(** Outside a section that declares [Context {HPE : PrimEnv}], the instance
+    is the empty primitive environment, so that a statement over
+    [bstep_fuel] written without one keeps its meaning (the semantics without
+    primitives, [bstep_fuel_empty_iff]). A local [HPE] is found first. *)
+#[global] Existing Instance empty_prim_env | 1000.
+
 Section EVAL.
 
   Variable (pr : prims).
+
+  Context {HPE : PrimEnv}.
 
   Variable (cenv : ctor_env).
 
@@ -118,20 +175,20 @@ Section EVAL.
         bstep_fuel rho' e cin v cout ->
         bstep rho (Eprim_val x p e) cin v cout
 
-  (* | BStept_prim :
-      forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
-        (f' : list val -> option val) (ys : list var) (e : exp)
-        (v : val) (v' : res) (cin : nat),
-          get_list ys rho = Some vs ->
-          M.get f pr = Some f' ->
-          f' vs = Some v ->
-          M.set x v rho = rho' ->
-          bstep_fuel rho' e v' cin ->
-          bstep rho (Eprim x f ys e) v' cin *)
   | BStept_halt :
       forall x v rho,
         M.get x rho = Some v ->
         bstep rho (Ehalt x) <0> (Res v) <0>
+  | BStept_prim :
+      forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
+        (f' : list val -> option val) (ys : list var) (e : exp)
+        (v : val) (v' : res) (cin : fuel) (cout : trace),
+          get_list ys rho = Some vs ->
+          M.get f prim_funs = Some f' ->
+          f' vs = Some v ->
+          M.set x v rho = rho' ->
+          bstep_fuel rho' e cin v' cout ->
+          bstep rho (Eprim x f ys e) cin v' cout
   with bstep_fuel :  env -> exp -> fuel -> @res val -> trace -> Prop :=
   | BStepf_OOT : (* not enought time units to take a step *)
       forall rho (e : exp) (c : fuel),
@@ -622,7 +679,14 @@ Section EVAL.
   | Eprimval_c_to_rho :
       forall rho rho' x p C,
         ctx_to_rho C (M.set x (Vprim p) rho) rho' ->
-        ctx_to_rho (Eprim_val_c x p C) rho rho'.
+        ctx_to_rho (Eprim_val_c x p C) rho rho'
+  | Eprim_c_to_rho :
+      forall rho rho' x f f' ys vs v C,
+        get_list ys rho = Some vs ->
+        M.get f prim_funs = Some f' ->
+        f' vs = Some v ->
+        ctx_to_rho C (M.set x v rho) rho' ->
+        ctx_to_rho (Eprim_c x f ys C) rho rho'.
 
   (** * Lemmas about [ctx_to_rho] *)
 
@@ -661,6 +725,10 @@ Section EVAL.
       edestruct IHHctx as [rho'' [H1 H2']]. eassumption.
       eexists; split. econstructor; eauto.
       eassumption.
+    - inv Hcomp. eexists; split. econstructor; eauto. econstructor; now eauto.
+      edestruct IHHctx as [rho'' [Hc1 Hc2']]. eassumption.
+      eexists; split. econstructor; eauto.
+      eassumption.
   Qed.
 
   Lemma ctx_to_rho_comp_ctx_f_r C1 C2 rho1 rho2 rho3 :
@@ -671,6 +739,7 @@ Section EVAL.
     revert C2 rho1 rho2 rho3.
     induction C1; intros C2 rho1 rho2 rho3 Hctx1 GHctx2; inv Hctx1.
     - eassumption.
+    - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
@@ -744,6 +813,13 @@ Section EVAL.
       forall rho r x v C (cin : fuel) (cout : trace),
         interpret_ctx_fuel C (M.set x (Vprim v) rho) cin r cout ->
         interpret_ctx (Eprim_val_c x v C) rho cin r cout
+  | Eprim_c_i :
+      forall rho r x f f' ys vs v C (cin : fuel) (cout : trace),
+        get_list ys rho = Some vs ->
+        M.get f prim_funs = Some f' ->
+        f' vs = Some v ->
+        interpret_ctx_fuel C (M.set x v rho) cin r cout ->
+        interpret_ctx (Eprim_c x f ys C) rho cin r cout
 
   with interpret_ctx_fuel : exp_ctx -> env -> fuel -> @res env -> trace -> Prop :=
   | ctx_hole:
@@ -793,8 +869,12 @@ Section EVAL.
       3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
       rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
-
     - simpl in Hb, Hi. inv Hb. inv H.
+      edestruct IHC. eassumption. eassumption. destructAll.
+      do 5 eexists. split; [| split ].
+      3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
+      rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
+      rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
     - simpl in Hb, Hi. inv Hb. inv H.
       edestruct IHC. eassumption. eassumption. destructAll. repeat subst_exp.
       do 5 eexists. split; [| split ].
@@ -862,22 +942,6 @@ Section EVAL.
     now inv Hin. inv Hin. reflexivity. inv Hin. reflexivity.
   Qed.
 
-
-  Lemma eval_ctx_app_OOT_Eprim rho C x p xs e1 e2 cin cout :
-    bstep_fuel rho (C |[ Eprim x p xs e1 ]|) cin OOT cout ->
-    interprable C = true ->
-    bstep_fuel rho (C |[ Eprim x p xs e2 ]|) cin OOT cout.
-  Proof.
-    revert rho cin cout.
-    induction C; intros rho cin cout Hs Hi; eauto;
-      try congruence;
-      try now (inv Hs;
-               [ econstructor; eassumption |
-                 inv H; unfold one; simpl;
-                 constructor 2; econstructor; eauto ]).
-
-    Unshelve. exact 0%nat.
-  Qed.
 
   (*Lemma eval_ctx_app_OOT_Eprim_val rho C x p e1 e2 cin cout :
     bstep_fuel rho (C |[ Eprim_val x p e1 ]|) cin OOT cout ->
@@ -954,7 +1018,10 @@ Section EVAL.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
       eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
-    - inv H0.
+    - inv H0. rewrite bound_var_Eprim_c in *.
+      eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
+      eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
     - inv H0. rewrite bound_var_Eletapp_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
@@ -1061,7 +1128,14 @@ Section EVAL.
           rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- plus_assoc. eauto.
     - inv Hstep.
       + left. econstructor; [| congruence ]. eassumption.
-      + inv H.
+      + inv H. match goal with
+               | [ Hs : bstep_fuel _ (C |[ _ ]|) _ OOT _ |- _ ] => eapply IHC in Hs; eauto; inv Hs
+               end.
+        * left. eapply ctx_step; [ congruence | econstructor; eauto ].
+        * destructAll. right. do 5 eexists.
+          split; [| split ]; [| eassumption |]. econstructor. congruence. econstructor; eauto.
+          rewrite (plus_assoc _ _ x1), (plus_comm (one_ctx _) x1), <- plus_assoc.
+          rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- plus_assoc. eauto.
     - inv Hstep.
       + left. econstructor; [| congruence ]. eassumption.
       + inv H.
@@ -1727,6 +1801,162 @@ Section EVAL.
   Abort.
 
 End EVAL.
+
+
+(** * The semantics without primitives
+
+    [bstep_np]/[bstep_fuel_np] is the fuel semantics as it was before the rule
+    [BStept_prim] was added. With the empty primitive environment,
+    [bstep_fuel] coincides with it ([bstep_fuel_empty_iff]). *)
+
+Section NoPrim.
+
+  Variable (cenv : ctor_env).
+
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+
+  Open Scope alg_scope.
+
+  Inductive bstep_np :  env -> exp -> fuel -> @res val -> trace -> Prop :=
+  | BStept_constr_np :
+      forall (x : var) (t : ctor_tag) (ys :list var) (e : exp)
+             (rho rho' : env) (vs : list val) (v : res) (cin : fuel) (cout : trace),
+        get_list ys rho = Some vs ->
+        M.set x (Vconstr t vs) rho = rho' ->
+        bstep_fuel_np rho' e cin v cout ->
+        bstep_np rho (Econstr x t ys e) cin v cout
+  | BStept_proj_np :
+      forall (t : ctor_tag) (vs : list val)
+             (rho : env) (x : var) (n : N) (y : var)
+             (e : exp) (v : val) (v' : res) (cin : fuel) (cout : trace),
+        M.get y rho = Some (Vconstr t vs) ->
+        nthN vs n = Some v ->
+        bstep_fuel_np (M.set x v rho) e cin v' cout ->
+        bstep_np rho (Eproj x t n y e) cin v' cout
+  | BStept_case_np :
+      forall (y : var) (v : res) (e : exp) (t : ctor_tag) (cl : list (ctor_tag * exp))
+             (vl : list val) (rho : env) (cin : fuel) (n : nat) (cout : trace),
+        M.get y rho = Some (Vconstr t vl) ->
+        caseConsistent cenv cl t ->
+        find_tag_nth cl t e n ->
+        bstep_fuel_np rho e cin v cout ->
+        bstep_np rho (Ecase y cl) cin v cout
+  | BStept_app_np :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
+             (xs : list var) (e : exp) (rho'' rho : env) (f : var)
+             (t : ctor_tag) (ys : list var) (v : res) (cin : fuel) (cout : trace),
+        M.get f rho = Some (Vfun rho' fl f') ->
+        get_list ys rho = Some vs ->
+        (* The number of instructions generated here should be
+         * independent of the size of B. We just need to
+         * jump to a label *)
+        find_def f' fl = Some (t,xs,e) ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        bstep_fuel_np rho'' e cin v cout ->
+        bstep_np rho (Eapp f t ys) cin v cout
+  | BStept_letapp_np :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
+             (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
+             (t : ctor_tag) (ys : list var) (v : val) (v' : res)
+             (cin1 cin2 : fuel) (cout1 cout2 : trace),
+        (* evaluate application *)
+        M.get f rho = Some (Vfun rho' fl f') ->
+        get_list ys rho = Some vs ->
+        find_def f' fl = Some (t,xs,e_body) ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        bstep_fuel_np rho'' e_body cin1 (Res v) cout1 -> (* body evaluates to v *)
+        (* evaluate let continuation *)
+        bstep_fuel_np (M.set x v rho) e cin2 v' cout2 ->
+        bstep_np rho (Eletapp x f t ys e) (cin1 <+> cin2) v' (cout1 <+> cout2)
+  | BStept_letapp_oot_np :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
+             (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
+             (t : ctor_tag) (ys : list var) (cin : fuel) (cout : trace),
+        M.get f rho = Some (Vfun rho' fl f') ->
+        get_list ys rho = Some vs ->
+        find_def f' fl = Some (t,xs,e_body) ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        bstep_fuel_np rho'' e_body cin OOT cout -> (* body times out*)
+        bstep_np rho (Eletapp x f t ys e) cin OOT cout
+  | BStept_fun_np :
+      forall (rho : env) (B : fundefs) (e : exp) (v : res) (cin : fuel) (cout : trace),
+        bstep_fuel_np (def_funs B B rho rho) e cin v cout ->
+        (* The definition of a function incur cost proportional to the number of FVs
+        (to make the bound of the current cc independent of the term) *)
+        bstep_np rho (Efun B e) cin v cout
+
+ | BStept_prim_val_np :
+    forall (rho' rho : env) (x : var) (p : primitive_value)
+             (e : exp) v (cin : fuel) (cout : trace),
+        M.set x (Vprim p) rho = rho' ->
+        bstep_fuel_np rho' e cin v cout ->
+        bstep_np rho (Eprim_val x p e) cin v cout
+
+  | BStept_halt_np :
+      forall x v rho,
+        M.get x rho = Some v ->
+        bstep_np rho (Ehalt x) <0> (Res v) <0>
+  with bstep_fuel_np :  env -> exp -> fuel -> @res val -> trace -> Prop :=
+  | BStepf_OOT_np : (* not enought time units to take a step *)
+      forall rho (e : exp) (c : fuel),
+        (c << <1> e) -> (* not enough fuel *)
+        bstep_fuel_np rho e c OOT <0>
+  | BStepf_run_np : (* take a step *)
+      forall rho e r (cin : fuel) (cout : trace),
+        bstep_np rho e cin r cout ->
+        bstep_fuel_np rho e (cin <+> (<1> e)) r (cout <+> (<1> e)).
+
+  Scheme bstep_np_ind' := Minimality for bstep_np Sort Prop
+    with bstep_fuel_np_ind' := Minimality for bstep_fuel_np Sort Prop.
+
+  Lemma bstep_empty_np rho e cin r cout
+    (H : @bstep empty_prim_env cenv fuel Hf trace Ht rho e cin r cout) : bstep_np rho e cin r cout
+  with bstep_fuel_empty_np rho e cin r cout
+    (H : @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout) : bstep_fuel_np rho e cin r cout.
+  Proof.
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + eapply BStept_letapp_oot_np; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + exfalso. cbn in *. rewrite M.gempty in *. congruence.
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
+  Qed.
+
+  Lemma bstep_np_empty rho e cin r cout
+    (H : bstep_np rho e cin r cout) : @bstep empty_prim_env cenv fuel Hf trace Ht rho e cin r cout
+  with bstep_fuel_np_empty rho e cin r cout
+    (H : bstep_fuel_np rho e cin r cout) : @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout.
+  Proof.
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + eapply BStept_letapp_oot; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
+  Qed.
+
+  Theorem bstep_fuel_empty_iff rho e cin r cout :
+    @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout <-> bstep_fuel_np rho e cin r cout.
+  Proof.
+    split; [ eapply bstep_fuel_empty_np | eapply bstep_fuel_np_empty ].
+  Qed.
+
+End NoPrim.
 
 
 Ltac destruct_bstep :=

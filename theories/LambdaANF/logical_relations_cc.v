@@ -17,6 +17,7 @@ Section LogRelCC.
 
   Variable (pr : prims).
   Variable (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   (* Tag for closure records *)
   Variable (clo_tag : ctor_tag).
@@ -39,7 +40,7 @@ Section LogRelCC.
       let '(e2, rho2) := p2 in
       forall v1 cin1 cout1,
         to_nat cin1 <= k -> bstep_fuel cenv rho1 e1 cin1 v1 cout1 ->
-        (* @not_stuck cenv fuel _ trace _ rho1 e1 -> *)
+        (* @not_stuck _ cenv fuel _ trace _ rho1 e1 -> *)
         exists v2 cin2 cout2,
           bstep_fuel cenv rho2 e2 cin2 v2 cout2 /\
           (* extra invariants for cost *)
@@ -991,49 +992,62 @@ Section LogRelCC.
   Qed.
 
 
-  Axiom Prim_axiom_cc :
-    forall f f' v1,
-      M.get f pr = Some f' ->
-      forall k S vs1 vs2,
-        Forall2 (cc_approx_val k S) vs1 vs2 ->
-        f' vs1 = Some v1 ->
-        exists v2,
-          f' vs2 = Some v2 /\
-          cc_approx_val k S v1 v2.
+  (** First-order values are related to themselves only. *)
+  Lemma cc_approx_val_fo_refl k PG' v :
+    fo_val v -> cc_approx_val k PG' v v.
+  Proof.
+    intros Hv. induction Hv using fo_val_ind_strong; rewrite cc_approx_val_eq; simpl; eauto.
+    split; [ reflexivity | ].
+    clear H. induction H0; constructor; eauto.
+  Qed.
+
+  Lemma cc_approx_val_fo_eq k PG' v1 v2 :
+    fo_val v1 -> cc_approx_val k PG' v1 v2 -> v1 = v2.
+  Proof.
+    intros Hv. revert v2.
+    induction Hv using fo_val_ind_strong; intros v2 Hrel; rewrite cc_approx_val_eq in Hrel;
+      destruct v2; simpl in Hrel; try contradiction; subst; eauto.
+    destruct Hrel as [Htag Hall]; subst. f_equal.
+    clear H. revert l Hall. induction H0; intros l2 Hall; inv Hall; eauto.
+    f_equal; eauto.
+  Qed.
+
+  Lemma cc_approx_val_fo_list_eq k PG' vs1 vs2 :
+    Forall fo_val vs1 -> Forall2 (cc_approx_val k PG') vs1 vs2 -> vs1 = vs2.
+  Proof.
+    intros Hfo Hall. induction Hall; inv Hfo; eauto.
+    f_equal; eauto. eapply cc_approx_val_fo_eq; eauto.
+  Qed.
 
   Lemma cc_approx_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
+    post_prim_compat' x1 f ys1 e1 rho1 x2 f ys2 e2 rho2 P1 P2 ->
     post_OOT' (Eprim x1 f ys1 e1) rho1 (Eprim x2 f ys2 e2) rho2 P2 ->
     Forall2 (cc_approx_var_env k PG rho1 rho2) ys1 ys2 ->
-    (* (forall m v1 v2 vs f',
-       m < k ->
-       (* needed by the cost proof *)
-       get_list ys1 rho1 = Some vs ->
-       M.get f pr = Some f' ->
-       f' vs = Some v1 ->
-       cc_approx_val k PG v1 v2 ->
-       cc_approx_exp k P1 PG (e1, M.set x1 v1 rho1)
-                     (e2, M.set x2 v2 rho2)) -> *)
+    (forall v1 v2,
+        cc_approx_val k PG v1 v2 ->
+        cc_approx_exp k P1 PG (e1, M.set x1 v1 rho1)
+                      (e2, M.set x2 v2 rho2)) ->
     cc_approx_exp k P2 PG (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
   Proof.
-    intros Hoot Hall v1 cin cout Hleq1 Hstep1. inv Hstep1.
+    intros Hpost Hoot Hall Hpre v1 cin cout Hleq1 Hstep1. inv Hstep1.
     - (* OOT *)
       exists OOT, cin, <0>. split. constructor; eassumption.
       split; [| now eauto ]. eapply Hoot; eauto.
-   - inv H.
-(*   edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
-     edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
-     edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | | | | eassumption | ]; eauto.
-     simpl in *; lia. simpl in *; lia.
-     eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
-     econstructor 2; eauto. lia.
-     econstructor; eauto.
-     replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by lia.
-     eassumption.
-     replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
-     2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. lia. }
-     eapply HPost. eassumption.
-     eapply cc_approx_res_monotonic. eassumption.
-    simpl in *. lia. *)
+    - inv H.
+      edestruct (cc_approx_var_env_get_list rho1 rho2) as [vs2 [Hget' Hpre']];
+        [| eauto |]; eauto.
+      edestruct prim_funs_first_order as [Hfovs Hfov]; [ eassumption | eassumption | ].
+      assert (Heqvs := cc_approx_val_fo_list_eq _ _ _ _ Hfovs Hpre'). subst vs2.
+      rewrite to_nat_add in *.
+      assert (Hg := to_nat_one (exp_to_fin (Eprim x1 f ys1 e1))). unfold one in *.
+      edestruct (Hpre v v) as [v2 [c2 [cout' [Hstep [HS Hval]]]]];
+        [ eapply cc_approx_val_fo_refl; eassumption | | eassumption | ].
+      lia.
+      eexists. exists (c2 <+> one (Eprim x2 f ys2 e2)); repeat eexists.
+      econstructor 2; eauto. econstructor; eauto.
+      eapply Hpost; eauto.
+      eapply cc_approx_res_monotonic. eassumption.
+      simpl in *. lia.
   Qed.
 
   End Compat.
@@ -1368,8 +1382,8 @@ Section LogRelCC.
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, cc_approx_exp k P PG (e1, rho1) (e2, rho2)) ->
-      @diverge cenv fuel _ trace _ rho1 e1 ->
-      @diverge cenv fuel _ trace _ rho2 e2.
+      @diverge _ cenv fuel _ trace _ rho1 e1 ->
+      @diverge _ cenv fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hdiv. assert (Hdiv' := Hdiv).
       specialize (Hrel e1 rho1 e2 rho2). inv Hrel.
@@ -1387,8 +1401,8 @@ Section LogRelCC.
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, cc_approx_exp k P PG (e1, rho1) (e2, rho2)) ->
-      @not_stuck cenv fuel _ trace _ rho1 e1 ->
-      @not_stuck cenv fuel _ trace _ rho2 e2.
+      @not_stuck _ cenv fuel _ trace _ rho1 e1 ->
+      @not_stuck _ cenv fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hns. assert (Hns' := Hns). inv Hns.
       - destructAll.
@@ -1502,6 +1516,17 @@ Section LogRelCC.
       simpl. eapply H1 with (C := Eprim_val_c x p Hole_c); eauto.
       econstructor; eauto. now econstructor.
       unfold one_ctx. rewrite to_nat_one. simpl. eassumption. eassumption.
+    - intros v1' c1 Hleq1 Hstep1 Hns.
+      edestruct IHHctx as [v2' [c2 [c3 [Hstep2 [Hub Hcc2]]]]]; try eassumption.
+      simpl exp_ctx_len in Hcc.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) in Hcc by lia.
+      eassumption.
+
+      eexists. eexists (c2 <+> one (Eprim_c x f ys C |[ e' ]|)). eexists. split; [| split ].
+      constructor 2; eauto. econstructor; eauto.
+      simpl. eapply H1 with (C := Eprim_c x f ys Hole_c); eauto.
+      econstructor; eauto. now econstructor.
+      unfold one_ctx. rewrite to_nat_one. simpl. eassumption. eassumption.
   Qed.
 
   Lemma cc_approx_exp_ctx_to_rho k (P : nat -> @PostT fuel trace) boundG rho1 rho2 rho2' C e e' m :
@@ -1593,6 +1618,26 @@ Section LogRelCC.
       + inv H. repeat subst_exp. do 3 eexists. split. eassumption.
         split.
         erewrite <- to_nat_one. eapply H1 with (C := Eprim_val_c x p Hole_c); try eassumption. constructor. constructor.
+        assumption.
+    - simpl exp_ctx_len.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) by lia.
+      eapply IHHctx; eauto.
+      intros v1' c1' c2' Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c3 [c3' [Hstep2 [Hub Hcc2]]]]]; try eassumption.
+      inv Hstep2; simpl in *; repeat subst_exp.
+      + destruct v1'; try contradiction.
+        eexists OOT, c3, <0>. split. econstructor; eauto. unfold one. erewrite one_eq. eassumption.
+
+        split.
+        erewrite <- to_nat_one. eapply H2 with (C := Eprim_c x f ys Hole_c).
+        econstructor; eauto. now econstructor.
+        simpl. eassumption.
+        simpl; eauto.
+      + match goal with Hb : bstep _ _ (Eprim _ _ _ _) _ _ _ |- _ => inv Hb end.
+        repeat subst_exp. do 3 eexists. split. eassumption.
+        split.
+        erewrite <- to_nat_one. eapply H1 with (C := Eprim_c x f ys Hole_c); try eassumption.
+        econstructor; eauto. constructor.
         assumption.
   Qed.
 

@@ -2468,7 +2468,7 @@ Section Correct.
     try unfold trace_res_exp in *; try unfold trace_res_pre in *.
 
   Global Instance eq_fuel_compat :
-    @Post_properties cenv nat _ unit _ eq_fuel eq_fuel eq_fuel.
+    @Post_properties cenv _ nat _ unit _ eq_fuel eq_fuel eq_fuel.
   Proof.
     unfold eq_fuel. constructor;
     try now (intro; intros; intro; intros; unfold_all; simpl; lia).
