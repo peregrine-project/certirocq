@@ -16,6 +16,7 @@ Import ListNotations.
 Section TailLetapp.
 
   Context (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   Local Notation PG := (inline_bound 1 1).
 
@@ -339,8 +340,14 @@ Section TailLetapp.
       eapply preord_env_P_monotonic; [| eassumption ]. lia.
       now (normalize_occurs_free; eauto with Ensembles_DB).
       rewrite preord_val_eq; eauto. reflexivity.
-    - eapply preord_exp_prim_compat; eauto; intros.
+    - eapply preord_exp_prim_compat; eauto.
       eapply Forall2_same. intros. apply Henv. now constructor.
+      intros m v1 v2 Hlt Hval. apply IHe; try eassumption.
+      intros. eapply IH; eauto. lia.
+      eapply preord_env_P_extend; eauto.
+      eapply preord_env_P_antimon.
+      eapply preord_env_P_monotonic; [| eassumption ]. lia.
+      now (normalize_occurs_free; eauto with Ensembles_DB).
     - eapply preord_exp_halt_compat; try eassumption. now eauto. now eauto.
       intros x HP. apply Henv; eauto.
   Qed.

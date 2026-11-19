@@ -27,6 +27,7 @@ Section Closure_conversion_correct.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
+  Context {HPE : PrimEnv}.
   Variable clo_tag : ctor_tag.
   Variable clo_itag : ind_tag.
 
@@ -1123,42 +1124,37 @@ Section Closure_conversion_correct.
       edestruct project_vars_correct as [Happ [Hfun' [Hgfun' [Henv' Hvar]]]]; eauto. now sets.
       edestruct Hvar as [v' [Hget' Happ']]; eauto.
       eapply ctx_to_rho_cc_approx_exp; eauto.
-      + eapply cc_approx_exp_prim_compat.
-        * eapply HOOT; eauto.
+      + eapply cc_approx_exp_prim_compat with (P1 := boundL 0).
+        * eapply HPost_prim. eauto.
+        * simpl. eapply HOOT.
         * eapply Forall2_cc_approx_var_env; eauto.
-(*      * intros vs1 vs2 l1 f Hgetl Hgetf Happf Hall.
-        { eapply IHe with (c := c'); [ now eauto | | | | | | | | | | | eassumption ].
-          * eapply cc_approx_env_P_extend with (v2 := vs2).
-            eapply cc_approx_env_P_antimon; [ eassumption |]...
-            eassumption.
-          * now eauto.
-          * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
-            eapply occurs_free_Eprim_Included.
-          * intros f1 Hfin. eauto.
-          * eapply injective_subdomain_antimon. eassumption. sets.
-          * eapply Disjoint_Included_r;
-              [| eapply Disjoint_Included_l; [ apply image_monotonic | now apply Hd ]].
-            normalize_bound_var... now eauto with Ensembles_DB.
-          * eapply Disjoint_Included_r;
+        * intros v1 v2 Hval.
+          { eapply IHe; [ | | | | | | | | | | eassumption ].
+            * eauto.
+            * eapply cc_approx_env_P_extend with (v2 := v2).
+              eapply cc_approx_env_P_antimon; [ eassumption |]...
+              eassumption.
+            * now eauto.
+            * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
+              eapply occurs_free_Eprim_Included.
+            * inv Hun. eassumption.
+            * eapply Disjoint_Included; [| | eapply Hd ].
+              normalize_bound_var... now sets.
+            * eapply Disjoint_Included_r;
               [| eapply Disjoint_Included_l; [ apply image_monotonic | now apply Hd' ]].
-            normalize_bound_var... now eauto with Ensembles_DB.
-          * eapply Fun_inv_set_In_Scope_l. now eauto.
-            eapply Fun_inv_set_In_Scope_r_not_Γ. now eauto.
-            eapply Disjoint_In_l. eapply Disjoint_sym.
-            eapply Disjoint_Included_l; [| eapply Hd' ]; sets. now constructor.
-            eapply Fun_inv_mon; [ | now eauto ].
-            eapply Disjoint_Included; [| | eapply Hd ]; sets.
-          * eapply FV_inv_set_In_Scope_l. now constructor.
-            eapply FV_inv_set_r. intros Hc. eapply Hnin.
-            subst. now eauto. now eapply FV_inv_extend_Scope_GFuns.
-          * eapply GFun_inv_set_not_In_GFuns_l. intros Hc. inv Hc. eapply H0. reflexivity.
-            eapply GFun_inv_set_not_In_GFuns_r.
-            intros Hc. eapply Hd. constructor. rewrite image_Union.
-            right. eapply image_monotonic; [| eassumption ]; sets. sets.
-            eapply GFun_inv_Scope_extend; sets.
-            eapply Disjoint_Included; [| | now eapply Hd ].
-            normalize_bound_var... sets.
-            eapply GFun_inv_antimon; sets. } *)
+              normalize_bound_var... now eauto with Ensembles_DB.
+            * eapply Fun_inv_set_In_Scope_l. now eauto.
+              eapply Fun_inv_set_In_Scope_r_not_Γ. now eauto.
+              eapply Disjoint_In_l. eapply Disjoint_sym. eapply Disjoint_Included_l; [| eapply Hd' ]; sets.
+              now constructor.
+              eapply Fun_inv_mon. eassumption.
+            * eapply FV_inv_set_In_Scope_l. now constructor.
+              eapply FV_inv_set_r. intros Hc. eapply Hnin.
+              subst. now eauto. now eapply FV_inv_extend_Scope_GFuns.
+            * eapply GFun_inv_set_not_In_GFuns_l.
+              intros Hc. eapply Hd. constructor; eauto.
+              eapply GFun_inv_set_not_In_GFuns_r.
+              intros Hc. eapply Hd. constructor; eauto. eassumption. }
     (* Case Ehalt *)
     - inv Hcc.
       assert(Hadm : sizeOf_exp_ctx C <= 4) by (eapply project_var_sizeOf_ctx_exp; eauto).

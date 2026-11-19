@@ -25,6 +25,7 @@ Section Lambda_lifting_correct.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
+  Context {HPE : PrimEnv}.
 
   Context (P1 : nat -> PostT) (* Local *) (* the nat parameter is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
           (PG : PostGT) (* Global *)
@@ -1693,7 +1694,6 @@ Section Lambda_lifting_correct.
     - inv Hun. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free...
-    (* Back when prims were not trivial:
       + intros m vs1 vs2 Hlt Hall. eapply IHk; [ eassumption | eassumption | | | | | | | | | | eassumption ].
         * eapply Disjoint_Included_l. now eapply image_extend_Included'.
           eapply Union_Disjoint_l.
@@ -1731,7 +1731,7 @@ Section Lambda_lifting_correct.
           intros Hc. eapply Hfvs. now constructor; eauto.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ]...
-          eapply Funs_inv_monotonic. eassumption. lia. *)
+          eapply Funs_inv_monotonic. eassumption. lia.
     - eapply preord_exp_halt_compat; eauto.
    Qed.
 

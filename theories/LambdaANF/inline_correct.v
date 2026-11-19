@@ -250,6 +250,7 @@ Section Inline_correct.
   Context (St : Type) (IH : InlineHeuristic St) (cenv : ctor_env)
           (P1 : nat -> @PostT fuel trace) (PG : @PostGT fuel trace)
           (G : nat).
+  Context {HPE : PrimEnv}.
 
   Variable (HProp : forall L, (L <= G)%nat -> Post_properties cenv (P1 L) (P1 L) PG)
            (HEapp_l : forall L v t l rho1 x rho2, post_Eapp_l (P1 L) (P1 (S L)) v t l rho1 x rho2)
@@ -2231,8 +2232,21 @@ Section Inline_correct.
           zify; lia.
         * eauto.
         * intros r1 r2 k Henv Hfm'. eapply preord_exp_prim_compat.
-          now eauto.
+          now eauto. now eauto.
           eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.
+          intros. eapply Hsem.
+          rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_alt.
+          -- eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
+             lia. normalize_occurs_free. sets.
+          -- eassumption.
+          -- intros Hc. eapply Hdis3. constructor. eapply Hf'. eapply Hf1.
+             normalize_occurs_free. eapply image_monotonic; [| eassumption ]. sets.
+          -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. lia.
+             intros Hc. inv Hc.
+             ++ eapply Hdis1. normalize_bound_var. normalize_occurs_free. constructor. now right. eauto.
+             ++ eapply Hdis4. constructor. normalize_bound_var. now right. eassumption.
+             ++ intros Hc. eapply Hdis3. constructor; try eassumption. rewrite image_Union. right. eassumption.
+             ++ normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included; sets; tci.
     - (* Ehalt *)
       eapply return_triple.
       intros. split; [| split; [| split; [| split; [| split; [| split ]]]]]; eauto.

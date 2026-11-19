@@ -921,22 +921,6 @@ Section EVAL.
   Qed.
 
 
-  Lemma eval_ctx_app_OOT_Eprim rho C x p xs e1 e2 cin cout :
-    bstep_fuel rho (C |[ Eprim x p xs e1 ]|) cin OOT cout ->
-    interprable C = true ->
-    bstep_fuel rho (C |[ Eprim x p xs e2 ]|) cin OOT cout.
-  Proof.
-    revert rho cin cout.
-    induction C; intros rho cin cout Hs Hi; eauto;
-      try congruence;
-      try now (inv Hs;
-               [ econstructor; eassumption |
-                 inv H; unfold one; simpl;
-                 constructor 2; econstructor; eauto ]).
-
-    Unshelve. exact 0%nat.
-  Qed.
-
   (*Lemma eval_ctx_app_OOT_Eprim_val rho C x p e1 e2 cin cout :
     bstep_fuel rho (C |[ Eprim_val x p e1 ]|) cin OOT cout ->
     interprable C = true ->

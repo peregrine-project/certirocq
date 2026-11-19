@@ -125,6 +125,7 @@ Section Shrink_correct.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
+  Context {HPE : PrimEnv}.
 
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 
@@ -914,23 +915,22 @@ Section Shrink_correct.
       rewrite bound_stem_Eprim_c in Hbv.
       eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_same. intros x0 Hin. eapply Hpre. left. constructor; eauto.
-    (*    + intros vs1 vs2 Hall.
+      + intros m v1 v2 Hlt Hval.
         assert (Disjoint _ S (Singleton _ v)).
         {
           eauto 10 with Ensembles_DB.
         }
-        eapply IHc; eauto.
+        eapply IH'; eauto.
         {
           intros.
-          apply Hyp; eauto.
+          apply Hyp; eauto. lia.
           eapply eq_env_P_set_not_in_P_l'; eauto.
           eapply eq_env_P_set_not_in_P_l'; eauto.
         }
         eauto with Ensembles_DB.
         eapply preord_env_P_extend; [| assumption ].
-        eapply preord_env_P_antimon; eauto.
-        simpl. rewrite occurs_free_Eprim.
-        eauto with Ensembles_DB. *)
+        eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]; lia.
+        simpl. rewrite Setminus_Union_distr. rewrite occurs_free_Eprim. sets.
     - rewrite bound_stem_Eletapp_c in Hbv. simpl.
       eapply preord_exp_letapp_compat; eauto; intros.
       * eapply Hpre. simpl. left. eapply occurs_free_Eletapp. sets.
@@ -1354,6 +1354,18 @@ Section Shrink_correct.
       simpl; eapply preord_exp_prim_compat; eauto; intros.
       eapply Forall2_preord_var_env_map. eassumption.
       normalize_occurs_free. sets.
+      eapply IHk; [ eassumption | | ].
+      * eapply Disjoint_Included; [| | eassumption ].
+        normalize_bound_var. now sets.
+        normalize_occurs_free. rewrite image'_Union.
+        eapply Included_trans. eapply image'_get_not_In. now sets.
+      * eapply preord_env_P_inj_remove.
+        -- intros Hc. eapply Hdis. normalize_occurs_free.
+           constructor; eauto. rewrite image'_Union. right; eauto.
+        -- eapply preord_env_P_inj_antimon.
+           eapply preord_env_P_inj_monotonic; [| eassumption ].
+           lia. normalize_occurs_free; sets.
+        -- eassumption.
     - (* Ehalt *)
       simpl; eapply preord_exp_halt_compat; eauto.
   Qed.

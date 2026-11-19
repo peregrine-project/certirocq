@@ -777,6 +777,7 @@ Qed.
 Section Hoisting_correct.
 
   Variable (pr : prims) (cenv : ctor_env) (G : nat).
+  Context {HPE : PrimEnv}.
 
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 
@@ -1101,8 +1102,22 @@ Section Hoisting_correct.
     - (* Eprim *)
       eapply preord_exp_prim_compat.
       + now eauto.
+      + now eauto.
       + eapply Forall2_same. intros x Hin. eapply Henv.
         now constructor.
+      + intros m1 v1 v2 Hlt Hval.
+        eapply IHk; try eassumption.
+        * eapply preord_env_P_extend.
+          -- eapply preord_env_P_antimon.
+             eapply preord_env_P_monotonic; [| eassumption ]. lia.
+             normalize_occurs_free. sets.
+          -- eassumption.
+        * eapply funs_inv_env_set. eassumption.
+          eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
+          normalize_bound_var; sets.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros B' Hbin. eapply Hfvs. constructor; eauto.
     - (* Ehalt *)
       eapply preord_exp_halt_compat; eauto.
       + eapply HP. lia.

@@ -505,6 +505,7 @@ Section Inline_correct.
   Definition PostGT : Type := @PostGT fuel trace.
 
   Context (cenv : ctor_env) (ctag : ctor_tag) (P1 P2 P3 : PostT) (PG : PostGT).
+  Context {HPE : PrimEnv}.
 
   Context (Hless_steps_letapp : remove_steps_letapp cenv P1 P2 P3)
           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P3)
@@ -692,28 +693,21 @@ Section Inline_correct.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
-
-        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *. simpl in *; lia. unfold one in *; simpl in *; lia.
-
-
-          destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll.
-          inv H2. inv H.
-
-        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
-          unfold one in *; simpl in *; lia. unfold one in *; simpl in *; lia.
-
-          destruct r2; [ | simpl in Hv2; contradiction ].
-
-          eexists OOT, cin2', cout2'. split; [| split ].
-
-          now eapply eval_ctx_app_OOT_Eprim; eassumption.
-
-          eapply Hless_steps_letapp_OOT; try eassumption. left. eassumption.
-          simpl; eauto.
-
+      + edestruct (IHe' (comp_ctx_f C' (Eprim_c v p l Hole_c)) k) with (C := C'')
+          as [r2 [cout2 [cout2' [Hs2 [Hp2 Hv2]]]]].
+        9:{ econstructor 2; eauto. }
+        * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
+        * eapply Hyp2.
+        * eassumption.
+        * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
+          rewrite bound_var_Eprim_c, bound_var_Hole_c in *. simpl.
+          eauto 10 with Ensembles_DB nocore.
+        * eassumption.
+        * eapply interprable_comp_f_l; eauto.
+        * eassumption.
+        * eassumption.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
+          split; [| split ]. eassumption. eassumption. eassumption.
     - inv Hin. simpl (_ |[ _ ]|).
       intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
@@ -999,27 +993,20 @@ Section Inline_correct.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
-
-        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *. simpl in *; lia. unfold one in *; simpl in *; lia.
-
-
-          destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll.
-          inv H2. inv H.
-
-        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
-          unfold one in *; simpl in *; lia. unfold one in *; simpl in *; lia.
-
-          destruct r2; [ | simpl in Hv2; contradiction ].
-
-          eexists OOT, cin2', cout2'. split; [| split ].
-
-          now eapply eval_ctx_app_OOT_Eprim; eassumption.
-
-          now eapply Hless_steps_letapp_OOT; eauto.
-          simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Eprim_c v p l Hole_c)) k) with (C := C'')
+          as [r2 [cout2 [cout2' [Hs2 [Hp2 Hv2]]]]].
+        8:{ econstructor 2; eauto. }
+        * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
+        * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
+          eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
+        * eassumption.
+        * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
+          rewrite bound_var_Eprim_c, bound_var_Hole_c in *. xsets.
+        * eapply interprable_comp_f_l; eauto.
+        * reflexivity.
+        * eassumption.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
+          split; [| split ]. eassumption. eassumption. eassumption.
     - inv Hin. simpl (_ |[ _ ]|).
       intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.

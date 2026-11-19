@@ -22,6 +22,7 @@ Close Scope Z_scope.
 Section ToplevelTheorems.
 
   Context (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
   Context (clo_tag : ctor_tag).
   Context (clo_itag : ind_tag).
 
@@ -475,6 +476,7 @@ Import MonadNotation.
 Section Compose.
 
   Context (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   Transparent bind.
 

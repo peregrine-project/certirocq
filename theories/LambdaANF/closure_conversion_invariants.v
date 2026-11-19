@@ -51,6 +51,7 @@ Section Closure_conversion_invariants.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
+  Context {HPE : PrimEnv}.
   Variable clo_tag : ctor_tag.
 
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.

@@ -17,6 +17,7 @@ Section LogRelCC.
 
   Variable (pr : prims).
   Variable (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   (* Tag for closure records *)
   Variable (clo_tag : ctor_tag).
@@ -991,49 +992,62 @@ Section LogRelCC.
   Qed.
 
 
-  Axiom Prim_axiom_cc :
-    forall f f' v1,
-      M.get f pr = Some f' ->
-      forall k S vs1 vs2,
-        Forall2 (cc_approx_val k S) vs1 vs2 ->
-        f' vs1 = Some v1 ->
-        exists v2,
-          f' vs2 = Some v2 /\
-          cc_approx_val k S v1 v2.
+  (** First-order values are related to themselves only. *)
+  Lemma cc_approx_val_fo_refl k PG' v :
+    fo_val v -> cc_approx_val k PG' v v.
+  Proof.
+    intros Hv. induction Hv using fo_val_ind_strong; rewrite cc_approx_val_eq; simpl; eauto.
+    split; [ reflexivity | ].
+    clear H. induction H0; constructor; eauto.
+  Qed.
+
+  Lemma cc_approx_val_fo_eq k PG' v1 v2 :
+    fo_val v1 -> cc_approx_val k PG' v1 v2 -> v1 = v2.
+  Proof.
+    intros Hv. revert v2.
+    induction Hv using fo_val_ind_strong; intros v2 Hrel; rewrite cc_approx_val_eq in Hrel;
+      destruct v2; simpl in Hrel; try contradiction; subst; eauto.
+    destruct Hrel as [Ht Hall]; subst. f_equal.
+    clear H. revert l Hall. induction H0; intros l2 Hall; inv Hall; eauto.
+    f_equal; eauto.
+  Qed.
+
+  Lemma cc_approx_val_fo_list_eq k PG' vs1 vs2 :
+    Forall fo_val vs1 -> Forall2 (cc_approx_val k PG') vs1 vs2 -> vs1 = vs2.
+  Proof.
+    intros Hfo Hall. induction Hall; inv Hfo; eauto.
+    f_equal; eauto. eapply cc_approx_val_fo_eq; eauto.
+  Qed.
 
   Lemma cc_approx_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
+    post_prim_compat' x1 f ys1 e1 rho1 x2 f ys2 e2 rho2 P1 P2 ->
     post_OOT' (Eprim x1 f ys1 e1) rho1 (Eprim x2 f ys2 e2) rho2 P2 ->
     Forall2 (cc_approx_var_env k PG rho1 rho2) ys1 ys2 ->
-    (* (forall m v1 v2 vs f',
-       m < k ->
-       (* needed by the cost proof *)
-       get_list ys1 rho1 = Some vs ->
-       M.get f pr = Some f' ->
-       f' vs = Some v1 ->
-       cc_approx_val k PG v1 v2 ->
-       cc_approx_exp k P1 PG (e1, M.set x1 v1 rho1)
-                     (e2, M.set x2 v2 rho2)) -> *)
+    (forall v1 v2,
+        cc_approx_val k PG v1 v2 ->
+        cc_approx_exp k P1 PG (e1, M.set x1 v1 rho1)
+                      (e2, M.set x2 v2 rho2)) ->
     cc_approx_exp k P2 PG (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
   Proof.
-    intros Hoot Hall v1 cin cout Hleq1 Hstep1. inv Hstep1.
+    intros Hpost Hoot Hall Hpre v1 cin cout Hleq1 Hstep1. inv Hstep1.
     - (* OOT *)
       exists OOT, cin, <0>. split. constructor; eassumption.
       split; [| now eauto ]. eapply Hoot; eauto.
-   - inv H.
-(*   edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
-     edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
-     edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | | | | eassumption | ]; eauto.
-     simpl in *; lia. simpl in *; lia.
-     eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
-     econstructor 2; eauto. lia.
-     econstructor; eauto.
-     replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by lia.
-     eassumption.
-     replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
-     2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. lia. }
-     eapply HPost. eassumption.
-     eapply cc_approx_res_monotonic. eassumption.
-    simpl in *. lia. *)
+    - inv H.
+      edestruct (cc_approx_var_env_get_list rho1 rho2) as [vs2 [Hget' Hpre']];
+        [| eauto |]; eauto.
+      edestruct prim_funs_first_order as [Hfovs Hfov]; [ eassumption | eassumption | ].
+      assert (Heqvs := cc_approx_val_fo_list_eq _ _ _ _ Hfovs Hpre'). subst vs2.
+      rewrite to_nat_add in *.
+      assert (Hg := to_nat_one (exp_to_fin (Eprim x1 f ys1 e1))). unfold one in *.
+      edestruct (Hpre v v) as [v2 [c2 [cout' [Hstep [HS Hval]]]]];
+        [ eapply cc_approx_val_fo_refl; eassumption | | eassumption | ].
+      lia.
+      eexists. exists (c2 <+> one (Eprim x2 f ys2 e2)); repeat eexists.
+      econstructor 2; eauto. econstructor; eauto.
+      eapply Hpost; eauto.
+      eapply cc_approx_res_monotonic. eassumption.
+      simpl in *. lia.
   Qed.
 
   End Compat.

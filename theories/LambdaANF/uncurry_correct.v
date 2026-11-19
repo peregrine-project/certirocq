@@ -295,6 +295,7 @@ Section Uncurry_correct.
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
   Variable (pr : prims).
   Variable (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
   Variable (Post : @PostT fuel trace).
   Variable (PostG : @PostGT fuel trace).
 
@@ -3059,6 +3060,7 @@ Section Uncurry_correct.
     - (* uncurry_prim *)
       apply preord_exp_prim_compat.
       now eapply Hpost_prop.
+      now eapply Hpost_prop.
       + induction args; constructor.
         apply Henv; constructor; now left.
         inv Hunique; inv Hunique1.
@@ -3073,6 +3075,18 @@ Section Uncurry_correct.
         intros a' Ha'; inv Ha'.
         constructor; now right.
         apply Free_Eprim2; assumption.
+      + intros k' v1 v2 Hk' Hv1_v2.
+        apply IH; inv Hunique; inv Hunique1; auto.
+        rewrite used_vars_Eprim in Hused.
+        eapply Included_trans; [|eassumption]...
+        rewrite used_vars_Eprim in Hused1.
+        eapply Included_trans; [|eassumption]...
+        intros a Ha; split_var_eq a x; subst; unfold preord_var_env.
+        * do 2 rewrite M.gss.
+          intros v0 Hv0; inv Hv0; eauto.
+        * do 2 (rewrite M.gso; [|assumption]).
+          apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
+          apply Henv; auto. apply Free_Eprim2; assumption.
     - (* uncurry_prim_val *) 
       eapply preord_exp_prim_val_compat.
       now eapply Hpost_prop.

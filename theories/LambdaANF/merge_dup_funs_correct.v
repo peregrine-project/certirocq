@@ -25,6 +25,7 @@ Import ListNotations.
 Section MergeDupFunsCorrect.
 
   Context (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   Local Notation PG := (simple_bound 0).
 
@@ -372,8 +373,14 @@ Section MergeDupFunsCorrect.
           eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
           normalize_occurs_free. sets.
           rewrite preord_val_eq; eauto. reflexivity.
-      - eapply preord_exp_prim_compat; eauto; intros.
+      - eapply preord_exp_prim_compat; eauto.
         eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. sets.
+        intros m v1 v2 Hlt Hval. eapply IHe; eauto.
+        + intros. eapply IH; eauto. lia.
+        + eapply inj_set; eauto.
+          eapply preord_env_P_inj_antimon.
+          eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
+          normalize_occurs_free. sets.
       - eapply preord_exp_halt_compat; try eassumption. now eauto. now eauto.
         eapply Henv; eauto.
     Qed.
@@ -552,7 +559,12 @@ Section MergeDupFunsCorrect.
       - (* Eprim *)
         split_checks.
         eapply preord_exp_prim_compat; eauto.
-        eapply alpha_env_vars; [ eassumption | normalize_occurs_free; sets | eassumption ].
+        + eapply alpha_env_vars; [ eassumption | normalize_occurs_free; sets | eassumption ].
+        + intros m w1 w2 Hlt Hval. eapply IHe1; eauto.
+          * eapply ran_ok_set; eauto.
+          * eapply alpha_env_set; eauto.
+            eapply alpha_env_monotonic; [| eapply alpha_env_antimon; [ eassumption | ] ]. lia.
+            normalize_occurs_free. sets.
       - (* Ehalt *)
         eapply preord_exp_halt_compat; try eassumption. now eauto. now eauto.
         eapply Henv; eauto.

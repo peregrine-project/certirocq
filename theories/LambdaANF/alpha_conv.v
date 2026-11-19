@@ -802,6 +802,7 @@ Section Alpha_conv_correct.
   Definition PostGT : Type := @PostGT fuel trace.
 
   Variable cenv : ctor_env.
+  Context {HPE : PrimEnv}.
   Context (P1 : PostT) (* Local *)
           (PG : PostGT) (* Global *)
           (Hcompat : Post_properties cenv P1 P1 PG).
@@ -1702,11 +1703,25 @@ Section Alpha_conv_correct.
       intros x y Hin1 Hin2 Heq. specialize (Henv x).
       rewrite Heq in Henv. eapply Henv.
       now constructor.
-    - eapply preord_exp_prim_compat; eauto; intros.
+    - eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_monotonic_strong; [| eassumption ].
         intros x y Hin1 Hin2 Heq. specialize (Henv x).
         rewrite Heq in Henv. eapply Henv.
         now constructor.
+      + intros m v1 v2 Hlt Hval.
+        assert (Hinj' : injective_subdomain (v |: occurs_free e1) (g {v ~> x'})).
+        { eapply injective_subdomain_extend'.
+          - rewrite Setminus_Union_distr.
+            rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l.
+            eapply injective_subdomain_antimon. eassumption. normalize_occurs_free...
+          - intros Hc. match goal with Hn : ~ _ \in image _ _ :|: _ |- _ => eapply Hn end.
+            left. eapply image_monotonic; [| eassumption ].
+            sets. }
+        eapply IH; try eassumption.
+        * eapply injective_subdomain_antimon; eauto...
+        * eapply preord_env_P_inj_set.
+          eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
+          lia. normalize_occurs_free... eassumption. eassumption.
   (* + assert (Hinj' : injective_subdomain (v |: occurs_free e1) (g {v ~> x'})).
         { eapply injective_subdomain_extend'.
           - rewrite Setminus_Union_distr.

@@ -59,6 +59,7 @@ Definition preserves_fv (e1 e2 : exp) := occurs_free e2 \subset occurs_free e1.
 Section RelComp.
 
   Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context {HPE : PrimEnv}.
 
   Context (wf_pres : exp -> exp -> Prop) (post_prop : post_property).
 
@@ -358,6 +359,7 @@ Section Linking.
 
   Context (lft: fun_tag).
   Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context {HPE : PrimEnv}.
 
 
   Definition link (x : var) (e1 e2 : exp) : exp :=
@@ -717,6 +719,7 @@ Section LinkingFast.
 
   Context (lft: fun_tag).
   Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context {HPE : PrimEnv}.
 
   Definition link' (x : var) (* the external reference that will be bound to e1 *)
              (e1 e2 : exp) : option exp :=
@@ -917,6 +920,7 @@ End LinkingFast.
 Section Refinement.
 
   Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context {HPE : PrimEnv}.
 
   Fixpoint value_ref' (v1 v2 : val) : Prop:=
     let fix Forall2_aux vs1 vs2 :=
