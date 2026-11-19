@@ -339,6 +339,7 @@ Section Uncurry_correct.
     (Hpost_refl_letapp : post_letapp_compat cenv Post' Post' Post')
     (Hpost_refl_letapp_OOT : post_letapp_compat_OOT Post' Post')
     (Hpost_refl_primval : post_primval_compat Post' Post')
+    (Hpost_refl_prim : post_prim_compat Post' Post')
     (Hpost_refl_OOT : post_OOT Post')
     (Hpost_refl_base : post_base Post') :
     preord_env_P cenv Post' (occurs_free_fundefs fds) k rho rho1 ->
@@ -2910,6 +2911,7 @@ Section Uncurry_correct.
     (Hpost_refl_letapp : post_letapp_compat cenv Post Post Post)
     (Hpost_refl_letapp_OOT : post_letapp_compat_OOT Post Post)
     (Hpost_refl_primval : post_primval_compat Post Post)
+    (Hpost_refl_prim : post_prim_compat Post Post)
     (Hpost_refl_OOT : post_OOT Post)
     (Hpost_refl_base : post_base Post).
 
@@ -2929,6 +2931,7 @@ Section Uncurry_correct.
     (HpostG_refl_letapp : post_letapp_compat cenv PostG PostG PostG)
     (HpostG_refl_letapp_OOT : post_letapp_compat_OOT PostG PostG)
     (HpostG_refl_primval : post_primval_compat PostG PostG)
+    (HpostG_refl_prim : post_prim_compat PostG PostG)
     (HpostG_refl_OOT : post_OOT PostG)
     (HpostG_refl_base : post_base PostG).
 
@@ -3058,7 +3061,7 @@ Section Uncurry_correct.
         apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
         apply Henv; auto.
     - (* uncurry_prim *)
-      apply preord_exp_prim_compat.
+      eapply preord_exp_prim_compat with (P1 := Post).
       now eapply Hpost_prop.
       now eapply Hpost_prop.
       + induction args; constructor.
@@ -3086,7 +3089,7 @@ Section Uncurry_correct.
           intros v0 Hv0; inv Hv0; eauto.
         * do 2 (rewrite M.gso; [|assumption]).
           apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
-          apply Henv; auto. apply Free_Eprim2; assumption.
+          apply Henv; auto.
     - (* uncurry_prim_val *) 
       eapply preord_exp_prim_val_compat.
       now eapply Hpost_prop.
