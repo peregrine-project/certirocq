@@ -72,6 +72,12 @@ Qed.
 Definition empty_prim_env : PrimEnv :=
   {| prim_funs := M.empty _; prim_funs_first_order := prims_first_order_empty |}.
 
+(** Outside a section that declares [Context {HPE : PrimEnv}], the instance
+    is the empty primitive environment, so that a statement over
+    [bstep_fuel] written without one keeps its meaning (the semantics without
+    primitives, [bstep_fuel_empty_iff]). A local [HPE] is found first. *)
+#[global] Existing Instance empty_prim_env | 1000.
+
 Section EVAL.
 
   Variable (pr : prims).
