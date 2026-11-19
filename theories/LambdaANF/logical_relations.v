@@ -35,8 +35,8 @@ Close Scope Z_scope.
 
 Section Log_rel.
 
-  Variable (pr : prims).
   Variable (cenv : ctor_env).
+  Context {HPE : PrimEnv}.
 
   Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
@@ -513,6 +513,33 @@ Section Log_rel.
     eapply preord_val_monotonic; eauto.
   Qed.
 
+  (** First-order values are related to themselves only. *)
+  Lemma preord_val_fo_refl PG k v :
+    fo_val v -> preord_val PG k v v.
+  Proof.
+    intros Hv. induction Hv using fo_val_ind_strong; rewrite preord_val_eq; simpl; eauto.
+    split; [ reflexivity | ].
+    clear H. induction H0; constructor; eauto.
+  Qed.
+
+  Lemma preord_val_fo_eq PG k v1 v2 :
+    fo_val v1 -> preord_val PG k v1 v2 -> v1 = v2.
+  Proof.
+    intros Hv. revert v2.
+    induction Hv using fo_val_ind_strong; intros v2 Hrel; rewrite preord_val_eq in Hrel;
+      destruct v2; simpl in Hrel; try contradiction; subst; eauto.
+    destruct Hrel as [Ht Hall]; subst. f_equal.
+    clear H. revert l Hall. induction H0; intros l2 Hall; inv Hall; eauto.
+    f_equal; eauto.
+  Qed.
+
+  Lemma preord_val_fo_list_eq PG k vs1 vs2 :
+    Forall fo_val vs1 -> Forall2 (preord_val PG k) vs1 vs2 -> vs1 = vs2.
+  Proof.
+    intros Hfo Hall. induction Hall; inv Hfo; eauto.
+    f_equal; eauto. eapply preord_val_fo_eq; eauto.
+  Qed.
+
   Lemma preord_res_monotonic (k j: nat)  r1 r2 :
     preord_res preord_val PostG k r1 r2 ->
     j <= k ->
@@ -666,6 +693,12 @@ Section Log_rel.
       P2 (Eprim_val x p e1, rho1, c1 <+> one (Eprim_val x p e1), cout1 <+> one (Eprim_val x p e1))
          (Eprim_val x' p' e2, rho2, c2 <+> one (Eprim_val x' p' e2), cout2 <+> one (Eprim_val x' p' e2)).
 
+  Definition post_prim_compat' x f ys e1 rho1 x' f' ys' e2 rho2 (P1 P2 : PostT) :=
+    forall v1 v2 c1 c2 cout1 cout2,
+      P1 (e1, M.set x v1 rho1, c1, cout1)  (e2, M.set x' v2 rho2, c2, cout2) ->
+      P2 (Eprim x f ys e1, rho1, c1 <+> one (Eprim x f ys e1), cout1 <+> one (Eprim x f ys e1))
+         (Eprim x' f' ys' e2, rho2, c2 <+> one (Eprim x' f' ys' e2), cout2 <+> one (Eprim x' f' ys' e2)).
+
   Definition post_constr_compat (P1 P2 : PostT) :=
     forall x t ys e1 rho1 x' t' ys' e2 rho2, post_constr_compat' x t ys e1 rho1 x' t' ys' e2 rho2 P1 P2.
 
@@ -699,6 +732,9 @@ Section Log_rel.
   Definition post_primval_compat (P1 P2 : PostT) :=
     forall x p e1 rho1 x' p' e2 rho2, post_primval_compat' x p e1 rho1 x' p' e2 rho2 P1 P2.
 
+  Definition post_prim_compat (P1 P2 : PostT) :=
+    forall x f ys e1 rho1 x' f' ys' e2 rho2, post_prim_compat' x f ys e1 rho1 x' f' ys' e2 rho2 P1 P2.
+
   Class Post_properties (P1 P2 : PostT) (PG : PostGT) : Prop :=
     { HPost_con : post_constr_compat P1 P2;
       HPost_proj : post_proj_compat P1 P2;
@@ -709,6 +745,7 @@ Section Log_rel.
       HPost_letapp : post_letapp_compat P1 P2 PG;
       HPost_letapp_OOT : post_letapp_compat_OOT P1 PG;
       HPost_primval : post_primval_compat P1 P2;
+      HPost_prim : post_prim_compat P1 P2;
       HPost_OOT : post_OOT P2;
       Hpost_base : post_base P2;
       HGPost : inclusion _ P1 PG }.
@@ -1083,15 +1120,6 @@ Section Log_rel.
 
 
 
-    Axiom Prim_axiom :
-      forall f f' v1,
-        M.get f pr = Some f' ->
-        forall k vs1 vs2,
-          Forall2 (preord_val PG k) vs1 vs2 ->
-          f' vs1 = Some v1 ->
-          exists v2,
-            f' vs2 = Some v2 /\
-            preord_val PG k v1 v2.
  (*
     Lemma preord_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
       Forall2 (preord_var_env PG k rho1 rho2) ys1 ys2 ->
@@ -1153,16 +1181,36 @@ Section Log_rel.
     Qed.
 
     Lemma preord_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2
+      (Hcompat : post_prim_compat' x1 f ys1 e1 rho1 x2 f ys2 e2 rho2 P1 P2)
       (HOOT : post_OOT' (Eprim x1 f ys1 e1) rho1 (Eprim x2 f ys2 e2) rho2 P2) :
-
       Forall2 (preord_var_env PG k rho1 rho2) ys1 ys2 ->
+      (forall m v1 v2,
+          m < k ->
+          preord_val PG m v1 v2 ->
+          preord_exp P1 PG m (e1, M.set x1 v1 rho1) (e2, M.set x2 v2 rho2)) ->
       preord_exp P2 PG k (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
     Proof.
-      intros Hall v1 cin cout Hleq1 Hstep1. inv Hstep1.
+      intros Hall Hpre v1 cin cout Hleq1 Hstep1. inv Hstep1.
       - (* OOT *)
         exists OOT, cin, <0>. split. econstructor. eassumption.
         split; [| now eauto ]. eapply HOOT; eassumption.
       - inv H.
+        rewrite to_nat_add in Hleq1.
+        assert (Hg := to_nat_one (exp_to_fin (Eprim x1 f ys1 e1))). unfold one in *.
+        edestruct (preord_var_env_get_list PG rho1 rho2) as [vs2 [Hget' Hpre']];
+          [| eauto |]; eauto.
+        edestruct prim_funs_first_order as [Hfovs Hfov]; [ eassumption | eassumption | ].
+        assert (Heqvs := preord_val_fo_list_eq _ _ _ _ Hfovs Hpre'). subst vs2.
+        edestruct (Hpre (k - to_nat (one (Eprim x1 f ys1 e1))) v v) as [v2 [cin' [cout' [Hstep [Hpost Hval]]]]];
+          [| | | eassumption | ]; eauto.
+        unfold one. simpl in *. lia.
+        eapply preord_val_fo_refl. eassumption.
+        unfold one; simpl in *; lia.
+        do 3 eexists. split; [| split ].
+        econstructor 2; eauto. now econstructor; eauto.
+        eapply Hcompat; try eassumption.
+        eapply preord_res_monotonic. eassumption.
+        simpl in *. rewrite to_nat_add. unfold one. simpl in *. lia.
     Qed.
 
 
@@ -1658,8 +1706,14 @@ Section Log_rel.
         eapply preord_env_P_monotonic; [| eassumption ]. lia.
         now (normalize_occurs_free; eauto with Ensembles_DB).
         rewrite preord_val_eq; eauto. reflexivity.
-      - eapply preord_exp_prim_compat; eauto; intros.
+      - eapply preord_exp_prim_compat; eauto.
         eapply Forall2_same. intros. apply Henv. now constructor.
+        intros m v1 v2 Hlt Hval. apply IHe; try eassumption.
+        intros. eapply IH; eauto. lia.
+        eapply preord_env_P_extend; eauto.
+        eapply preord_env_P_antimon.
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
+        now (normalize_occurs_free; eauto with Ensembles_DB).
       - eapply preord_exp_halt_compat; try eassumption. now eauto. now eauto.
         intros x HP. apply Henv; eauto.
     Qed.
@@ -1939,6 +1993,13 @@ Section Log_rel.
 
     - simpl. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
+      + intros m v1 v2 Hlt Hval. eapply IHc; eauto.
+        * intros. eapply IH'; eauto. lia.
+        * intros. eapply Hyp; eauto. lia.
+        * eapply preord_env_P_extend; [| assumption ].
+          eapply preord_env_P_antimon; eauto.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
+          simpl. normalize_occurs_free. sets.
     - simpl. eapply preord_exp_letapp_compat; eauto.
       + eapply Hpre. constructor. now left.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
