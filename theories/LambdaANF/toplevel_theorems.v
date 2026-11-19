@@ -151,7 +151,7 @@ Section LambdaLift.
                                            (PG := ll_bound 0).
     - intros. eapply ll_bound_compat.
     - intros. eapply ll_bound_compat.
-      exact (M.empty _). exact 0%nat.
+      all: first [ exact HPE | exact (M.empty _) | exact 0%nat ].
     - eapply ll_bound_mon. lia.
     - intros. eapply ll_bound_local_steps; eauto.
     - intros. eapply ll_bound_local_app.
@@ -852,7 +852,7 @@ Section BstepE.
     exists n, bstep_e (@prim_funs HPE) cenv rho e v n.
   Proof.
     intros H. remember (Res v) as r eqn:Er. revert v Er.
-    induction H using (bstep_fuel_ind' HPE cenv fuel Hf trace Ht) with
+    induction H using bstep_fuel_ind' with
       (P := fun rho e c r t => forall v, r = Res v -> exists n, bstep_e (@prim_funs HPE) cenv rho e v n);
       intros; subst;
       repeat match goal with
