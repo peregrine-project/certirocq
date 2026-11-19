@@ -128,6 +128,10 @@ Section TailLetapp.
   (** The last step of a terminating evaluation is an [Ehalt], which costs [(1, 0)]:
       with one unit of fuel less, the same term runs out of fuel with the trace
       minus that [Ehalt]. *)
+  (* [induction ... using] counts the parameters of the scheme: keep the
+     instance argument explicit. *)
+  Local Arguments bstep_fuel_ind' : clear implicits.
+
   Lemma bstep_fuel_Res_OOT_pred rho e c v cout :
     @bstep_fuel _ cenv nat fuel_res (nat * nat) trace_res rho e c (Res v) cout ->
     exists c' cout',
