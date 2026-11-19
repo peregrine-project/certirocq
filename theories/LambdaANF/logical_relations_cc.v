@@ -40,7 +40,7 @@ Section LogRelCC.
       let '(e2, rho2) := p2 in
       forall v1 cin1 cout1,
         to_nat cin1 <= k -> bstep_fuel cenv rho1 e1 cin1 v1 cout1 ->
-        (* @not_stuck cenv fuel _ trace _ rho1 e1 -> *)
+        (* @not_stuck _ cenv fuel _ trace _ rho1 e1 -> *)
         exists v2 cin2 cout2,
           bstep_fuel cenv rho2 e2 cin2 v2 cout2 /\
           (* extra invariants for cost *)
@@ -1007,7 +1007,7 @@ Section LogRelCC.
     intros Hv. revert v2.
     induction Hv using fo_val_ind_strong; intros v2 Hrel; rewrite cc_approx_val_eq in Hrel;
       destruct v2; simpl in Hrel; try contradiction; subst; eauto.
-    destruct Hrel as [Ht Hall]; subst. f_equal.
+    destruct Hrel as [Htag Hall]; subst. f_equal.
     clear H. revert l Hall. induction H0; intros l2 Hall; inv Hall; eauto.
     f_equal; eauto.
   Qed.
@@ -1382,8 +1382,8 @@ Section LogRelCC.
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, cc_approx_exp k P PG (e1, rho1) (e2, rho2)) ->
-      @diverge cenv fuel _ trace _ rho1 e1 ->
-      @diverge cenv fuel _ trace _ rho2 e2.
+      @diverge _ cenv fuel _ trace _ rho1 e1 ->
+      @diverge _ cenv fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hdiv. assert (Hdiv' := Hdiv).
       specialize (Hrel e1 rho1 e2 rho2). inv Hrel.
@@ -1401,8 +1401,8 @@ Section LogRelCC.
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, cc_approx_exp k P PG (e1, rho1) (e2, rho2)) ->
-      @not_stuck cenv fuel _ trace _ rho1 e1 ->
-      @not_stuck cenv fuel _ trace _ rho2 e2.
+      @not_stuck _ cenv fuel _ trace _ rho1 e1 ->
+      @not_stuck _ cenv fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hns. assert (Hns' := Hns). inv Hns.
       - destructAll.
@@ -1516,6 +1516,17 @@ Section LogRelCC.
       simpl. eapply H1 with (C := Eprim_val_c x p Hole_c); eauto.
       econstructor; eauto. now econstructor.
       unfold one_ctx. rewrite to_nat_one. simpl. eassumption. eassumption.
+    - intros v1' c1 Hleq1 Hstep1 Hns.
+      edestruct IHHctx as [v2' [c2 [c3 [Hstep2 [Hub Hcc2]]]]]; try eassumption.
+      simpl exp_ctx_len in Hcc.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) in Hcc by lia.
+      eassumption.
+
+      eexists. eexists (c2 <+> one (Eprim_c x f ys C |[ e' ]|)). eexists. split; [| split ].
+      constructor 2; eauto. econstructor; eauto.
+      simpl. eapply H1 with (C := Eprim_c x f ys Hole_c); eauto.
+      econstructor; eauto. now econstructor.
+      unfold one_ctx. rewrite to_nat_one. simpl. eassumption. eassumption.
   Qed.
 
   Lemma cc_approx_exp_ctx_to_rho k (P : nat -> @PostT fuel trace) boundG rho1 rho2 rho2' C e e' m :
@@ -1607,6 +1618,26 @@ Section LogRelCC.
       + inv H. repeat subst_exp. do 3 eexists. split. eassumption.
         split.
         erewrite <- to_nat_one. eapply H1 with (C := Eprim_val_c x p Hole_c); try eassumption. constructor. constructor.
+        assumption.
+    - simpl exp_ctx_len.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) by lia.
+      eapply IHHctx; eauto.
+      intros v1' c1' c2' Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c3 [c3' [Hstep2 [Hub Hcc2]]]]]; try eassumption.
+      inv Hstep2; simpl in *; repeat subst_exp.
+      + destruct v1'; try contradiction.
+        eexists OOT, c3, <0>. split. econstructor; eauto. unfold one. erewrite one_eq. eassumption.
+
+        split.
+        erewrite <- to_nat_one. eapply H2 with (C := Eprim_c x f ys Hole_c).
+        econstructor; eauto. now econstructor.
+        simpl. eassumption.
+        simpl; eauto.
+      + match goal with Hb : bstep _ _ (Eprim _ _ _ _) _ _ _ |- _ => inv Hb end.
+        repeat subst_exp. do 3 eexists. split. eassumption.
+        split.
+        erewrite <- to_nat_one. eapply H1 with (C := Eprim_c x f ys Hole_c); try eassumption.
+        econstructor; eauto. constructor.
         assumption.
   Qed.
 

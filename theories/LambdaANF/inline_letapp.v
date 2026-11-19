@@ -458,6 +458,7 @@ Open Scope alg_scope.
 Section Post.
 
   Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+  Context {HPE : PrimEnv}.
 
 
   Definition remove_steps_letapp cenv (P1 P2 P3 : @PostT fuel trace) :=
@@ -756,7 +757,7 @@ Section Inline_correct.
 
           eapply eval_ctx_app_Ehalt_div. eassumption. eassumption.
 
-          Unshelve. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
+          Unshelve. all: exact 1%positive.
   Qed.
 
 
@@ -790,6 +791,11 @@ Section Inline_correct.
       normalize_bound_stem_ctx_in_ctx. eapply IHC in H8; [| now sets ].
       eapply eq_env_P_set_not_in_P_l'. eassumption. sets.
     - inv Hi. inv H0.
+      normalize_bound_stem_ctx_in_ctx.
+      match goal with
+      | [ Hc : interpret_ctx_fuel _ C _ _ _ _ |- _ ] => eapply IHC in Hc; [| now sets ]
+      end.
+      eapply eq_env_P_set_not_in_P_l'. eassumption. sets.
     - inv Hi. inv H0.
       normalize_bound_stem_ctx_in_ctx. eapply IHC in H15; [| now sets ].
       eapply eq_env_P_set_not_in_P_l'. eassumption. sets.
@@ -1061,7 +1067,7 @@ Section Inline_correct.
 
           eapply eval_ctx_app_Ehalt_div. eassumption. eassumption.
 
-          Unshelve. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive. 
+          Unshelve. all: exact 1%positive. 
   Qed.
 
   Lemma inline_letapp_eval_l C e x x' v rho rho' (cin : fuel) (cout : trace):
@@ -1127,7 +1133,6 @@ Section Inline_correct.
         econstructor; eauto. econstructor.
       + rewrite M.gss. reflexivity.
       + left. rewrite !plus_assoc. rewrite !plus_zero. simpl. split; reflexivity.
-    - inv Hstep. inv H.
     - inv Hin. inv Hstep. inv H.
       do 3 eexists.
       split; [| split ].
@@ -1200,6 +1205,11 @@ Section Inline_correct.
         eapply Disjoint_Singleton_r. eassumption. reflexivity.
     - destruct (bound_stem_ctx_dec C) as [Dec]; destruct (Dec x).
       + eapply IHC; eassumption.
+      + inv Hin; [| contradiction ]. erewrite <- interpret_ctx_fuel_env_eq_P; eauto.
+        eexists. rewrite M.gss. reflexivity.
+        eapply Disjoint_Singleton_r. eassumption. reflexivity.
+    - destruct (bound_stem_ctx_dec C) as [Dec]; destruct (Dec x).
+      + eapply IHC; eassumption.
       + inv Hin; [| contradiction ]. erewrite <- interpret_ctx_fuel_env_eq_P; [| eassumption | | ].
         eexists. rewrite def_funs_eq. reflexivity. eassumption.
         eapply Disjoint_Singleton_r. eassumption. reflexivity.
@@ -1250,6 +1260,10 @@ Section Inline_correct.
       inv H0. eapply IHe in H8; eauto. destructAll.
       econstructor 2. econstructor; eauto.
     - inv Hinp. econstructor 1. eassumption. inv H0.
+      match goal with
+      | [ Hc : interpret_ctx_fuel _ C' _ _ _ _ |- _ ] => eapply IHe in Hc; eauto
+      end.
+      econstructor 2. econstructor; eauto.
     - inv Hin. inv Hinp. congruence. inv H0.
   Qed.
 
@@ -1317,9 +1331,6 @@ Section Inline_correct.
       + inv H.
         do 3 eexists. split. econstructor 3. congruence. eapply Eletapp_c_i_OOT; eauto.
         eauto.
-    - inv Hstep.
-      + do 3 eexists; split. econstructor. eassumption. congruence. eauto.
-      + inv H.
     - inv Hin. inv Hstep.
       + do 3 eexists; split. eapply ctx_hole. eauto. eapply lt_one in H. subst. eauto.
       + inv H.

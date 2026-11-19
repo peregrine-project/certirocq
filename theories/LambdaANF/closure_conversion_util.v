@@ -22,6 +22,7 @@ Close Scope Z_scope.
 Section Closure_conversion_util.
 
   Variable clo_tag : ctor_tag.
+  Context {HPE : PrimEnv}.
 
   Lemma project_vars_length Scope Funs GFuns c genv Γ FVs S x y C Q :
     project_vars clo_tag Scope Funs GFuns c genv Γ FVs S x y C Q ->

@@ -129,21 +129,21 @@ Section TailLetapp.
       with one unit of fuel less, the same term runs out of fuel with the trace
       minus that [Ehalt]. *)
   Lemma bstep_fuel_Res_OOT_pred rho e c v cout :
-    @bstep_fuel cenv nat fuel_res (nat * nat) trace_res rho e c (Res v) cout ->
+    @bstep_fuel _ cenv nat fuel_res (nat * nat) trace_res rho e c (Res v) cout ->
     exists c' cout',
-      @bstep_fuel cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
+      @bstep_fuel _ cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
       c = c' + 1 /\ cout = (fst cout' + 1, snd cout').
   Proof.
     set (P := fun rho e (c : nat) (r : @res val) (cout : nat * nat) =>
                 forall v, r = Res v ->
                           (c = 0 /\ cout = (0, 0) /\ exists x, e = Ehalt x) \/
                           (exists c' cout',
-                              @bstep cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
+                              @bstep _ cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
                               c = c' + 1 /\ cout = (fst cout' + 1, snd cout'))).
     set (P0 := fun rho e (c : nat) (r : @res val) (cout : nat * nat) =>
                  forall v, r = Res v ->
                            exists c' cout',
-                             @bstep_fuel cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
+                             @bstep_fuel _ cenv nat fuel_res (nat * nat) trace_res rho e c' OOT cout' /\
                              c = c' + 1 /\ cout = (fst cout' + 1, snd cout')).
     intros Hstep.
     assert (Hs : P0 rho e c (Res v) cout).

@@ -1741,23 +1741,23 @@ Section Alpha_conv_correct.
 End Alpha_conv_correct.
 
 #[global] Instance preord_env_P_inj_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
-  Proper (Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+  Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
          (@preord_env_P_inj fuel Hfuel trace Htrace).
 Proof.
   repeat (intro; intros); subst.
   split; intros Hpre;
-    eapply preord_env_P_inj_antimon; subst; eauto; eapply H1.
+    eapply preord_env_P_inj_antimon; subst; eauto; eapply H2.
 Qed.
 
 
 #[global] Instance preord_env_P_inj_f_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
-  Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
+  Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
          (@preord_env_P_inj fuel Hfuel trace Htrace).
 Proof.
   repeat (intro; intros); subst.
   split; intros Hpre.
-  intro; intros. rewrite <- H3. eauto.
-  intro; intros. rewrite H3. eauto.
+  intro; intros. rewrite <- H4. eauto.
+  intro; intros. rewrite H4. eauto.
 Qed.
 
 

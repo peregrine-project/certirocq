@@ -528,6 +528,7 @@ Section LinkingComp.
           (wf_pres : exp -> exp -> Prop)
           (cenv : ctor_env) (lf : var).
 
+  Context {HPE : PrimEnv}.
   Context (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG).
 
 
@@ -644,6 +645,8 @@ Section LinkingCompTop.
           (wf1 wf2 : exp -> Prop)
           (cenv : ctor_env) (ctag : ctor_tag) (lf : var) (P : PostT) (PG : PostGT).
 
+
+  Context {HPE : PrimEnv}.
 
   Context (* (Hwf : forall e e', wf_pres e e' -> preserves_fv e e') *)
           (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG)

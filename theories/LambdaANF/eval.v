@@ -673,7 +673,14 @@ Section EVAL.
   | Eprimval_c_to_rho :
       forall rho rho' x p C,
         ctx_to_rho C (M.set x (Vprim p) rho) rho' ->
-        ctx_to_rho (Eprim_val_c x p C) rho rho'.
+        ctx_to_rho (Eprim_val_c x p C) rho rho'
+  | Eprim_c_to_rho :
+      forall rho rho' x f f' ys vs v C,
+        get_list ys rho = Some vs ->
+        M.get f prim_funs = Some f' ->
+        f' vs = Some v ->
+        ctx_to_rho C (M.set x v rho) rho' ->
+        ctx_to_rho (Eprim_c x f ys C) rho rho'.
 
   (** * Lemmas about [ctx_to_rho] *)
 
@@ -712,6 +719,10 @@ Section EVAL.
       edestruct IHHctx as [rho'' [H1 H2']]. eassumption.
       eexists; split. econstructor; eauto.
       eassumption.
+    - inv Hcomp. eexists; split. econstructor; eauto. econstructor; now eauto.
+      edestruct IHHctx as [rho'' [Hc1 Hc2']]. eassumption.
+      eexists; split. econstructor; eauto.
+      eassumption.
   Qed.
 
   Lemma ctx_to_rho_comp_ctx_f_r C1 C2 rho1 rho2 rho3 :
@@ -722,6 +733,7 @@ Section EVAL.
     revert C2 rho1 rho2 rho3.
     induction C1; intros C2 rho1 rho2 rho3 Hctx1 GHctx2; inv Hctx1.
     - eassumption.
+    - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
@@ -851,8 +863,12 @@ Section EVAL.
       3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
       rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
-
     - simpl in Hb, Hi. inv Hb. inv H.
+      edestruct IHC. eassumption. eassumption. destructAll.
+      do 5 eexists. split; [| split ].
+      3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
+      rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
+      rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
     - simpl in Hb, Hi. inv Hb. inv H.
       edestruct IHC. eassumption. eassumption. destructAll. repeat subst_exp.
       do 5 eexists. split; [| split ].
@@ -996,7 +1012,10 @@ Section EVAL.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
       eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
-    - inv H0.
+    - inv H0. rewrite bound_var_Eprim_c in *.
+      eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
+      eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
     - inv H0. rewrite bound_var_Eletapp_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
@@ -1103,7 +1122,14 @@ Section EVAL.
           rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- plus_assoc. eauto.
     - inv Hstep.
       + left. econstructor; [| congruence ]. eassumption.
-      + inv H.
+      + inv H. match goal with
+               | [ Hs : bstep_fuel _ (C |[ _ ]|) _ OOT _ |- _ ] => eapply IHC in Hs; eauto; inv Hs
+               end.
+        * left. eapply ctx_step; [ congruence | econstructor; eauto ].
+        * destructAll. right. do 5 eexists.
+          split; [| split ]; [| eassumption |]. econstructor. congruence. econstructor; eauto.
+          rewrite (plus_assoc _ _ x1), (plus_comm (one_ctx _) x1), <- plus_assoc.
+          rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- plus_assoc. eauto.
     - inv Hstep.
       + left. econstructor; [| congruence ]. eassumption.
       + inv H.
@@ -1877,25 +1903,45 @@ Section NoPrim.
   Scheme bstep_np_ind' := Minimality for bstep_np Sort Prop
     with bstep_fuel_np_ind' := Minimality for bstep_fuel_np Sort Prop.
 
-  Lemma bstep_fuel_empty_np rho e cin r cout :
-    @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout -> bstep_fuel_np rho e cin r cout.
+  Lemma bstep_empty_np rho e cin r cout
+    (H : @bstep empty_prim_env cenv fuel Hf trace Ht rho e cin r cout) : bstep_np rho e cin r cout
+  with bstep_fuel_empty_np rho e cin r cout
+    (H : @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout) : bstep_fuel_np rho e cin r cout.
   Proof.
-    intros H.
-    induction H using bstep_fuel_ind'
-      with (P := fun rho e cin r cout => bstep_np rho e cin r cout)
-           (P0 := fun rho e cin r cout => bstep_fuel_np rho e cin r cout);
-      try now (econstructor; eauto).
-    cbn in *. rewrite M.gempty in *. congruence.
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + eapply BStept_letapp_oot_np; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + exfalso. cbn in *. rewrite M.gempty in *. congruence.
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
   Qed.
 
-  Lemma bstep_fuel_np_empty rho e cin r cout :
-    bstep_fuel_np rho e cin r cout -> @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout.
+  Lemma bstep_np_empty rho e cin r cout
+    (H : bstep_np rho e cin r cout) : @bstep empty_prim_env cenv fuel Hf trace Ht rho e cin r cout
+  with bstep_fuel_np_empty rho e cin r cout
+    (H : bstep_fuel_np rho e cin r cout) : @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout.
   Proof.
-    intros H.
-    induction H using bstep_fuel_np_ind'
-      with (P := fun rho e cin r cout => @bstep empty_prim_env cenv fuel Hf trace Ht rho e cin r cout)
-           (P0 := fun rho e cin r cout => @bstep_fuel empty_prim_env cenv fuel Hf trace Ht rho e cin r cout);
-      try now (econstructor; eauto).
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + eapply BStept_letapp_oot; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+      + econstructor; eauto.
+    - destruct H.
+      + econstructor; eauto.
+      + econstructor; eauto.
   Qed.
 
   Theorem bstep_fuel_empty_iff rho e cin r cout :
