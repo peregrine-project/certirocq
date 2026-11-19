@@ -2239,7 +2239,7 @@ Section Inline_correct.
           -- eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
              lia. normalize_occurs_free. sets.
           -- eassumption.
-          -- intros Hc. eapply Hdis3. constructor. eapply Hf'. eapply Hf1.
+          -- intros Hc. eapply Hdis3. constructor. eapply HSin. eapply Hf1.
              normalize_occurs_free. eapply image_monotonic; [| eassumption ]. sets.
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. lia.
              intros Hc. inv Hc.
@@ -2505,7 +2505,7 @@ Section Inline_correct.
 
     destruct p. destruct i. do 3 eexists.
     split; [| split; [| split; [| split; [| split ]]]].
-    - reflexivity.
+    - match goal with |- context [runState tt ?S] => pose proof (Hstate : runState tt S = _) as Hs'; rewrite Hs' end. reflexivity.
     - eassumption.
     - eapply Included_trans. eassumption. rewrite apply_r_empty_f_eq. rewrite image_id, occurs_free_fun_map_empty.
       sets.
