@@ -1135,7 +1135,10 @@ Section CONTRACT.
     apply Bool.negb_true_iff. auto.
   Defined.
   Next Obligation.
-    eapply measure_wf. eapply OrdersEx.Nat_as_OT.lt_wf_0.
+    (* [Acc_intro_generator] puts 2^40 lazy accessibility steps in front of
+       the proof, so that evaluating [contract] in Rocq does not compute the
+       accessibility proof of [lt]. *)
+    apply (Acc_intro_generator 40). eapply measure_wf. eapply OrdersEx.Nat_as_OT.lt_wf_0.
   Defined.
 
 

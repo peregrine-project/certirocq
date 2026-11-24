@@ -365,7 +365,8 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
              roots + collects if needed, then allocates, compiling the continuation
              with [chunk = cw - nwords] so its members run unchecked.  One
              [garbage_collect] with [nalloc = cw] covers the chunk — CertiGC's
-             contract (see [CertiGC_Contract]). *)
+             contract
+             ([runtime_correct] in [LambdaANF_to_LLVM_statement]). *)
           let nwords    := (1 + N.of_nat (List.length ys))%N in
           let allocp    := gep_tinfo 0 in
           if N.leb nwords chunk then

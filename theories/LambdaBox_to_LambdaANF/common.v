@@ -38,7 +38,9 @@ Proof.
   assert (H:= AstCommon.inductive_dec i i0).
   destruct H.
   - destruct (classes.eq_dec n n0).
-    + subst. left. auto.
+    (* [left] first: the decision then reduces even though the proof of
+       [i = i0] is opaque. *)
+    + left. rewrite e, e0. reflexivity.
     + right. intro. apply n1. inversion H. auto.
   - right; intro; apply n1. inversion H; auto.
 Defined.

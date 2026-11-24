@@ -32,6 +32,8 @@ LambdaBox_to_LambdaANF/anf_correct.v
 LambdaBox_to_LambdaANF/anf_divergence.v
 LambdaBox_to_LambdaANF/anf_global.v
 LambdaBox_to_LambdaANF/anf_toplevel.v
+LambdaBox_to_LambdaANF/wcbv_fuel_sem.v
+LambdaBox_to_LambdaANF/wcbv_pipeline_flags.v
 
 # LambdaANF
 LambdaANF/Ensembles_util.v
@@ -134,6 +136,10 @@ CodegenLLVM/LLVM_sim_exp.v
 CodegenLLVM/LLVM_restricted_check.v
 CodegenLLVM/LLVM_nonvacuity.v
 CodegenLLVM/LLVM_nonvacuity_run.v
+CodegenLLVM/LLVM_corollaries.v
+CodegenLLVM/LLVM_endtoend.v
+CodegenLLVM/LLVM_wcbv_link.v
+CodegenLLVM/LLVM_wcbv_pipeline.v
 
 # Glue
 Glue/glue_utils.v
@@ -143,6 +149,7 @@ Glue/glue.v
 Compiler/metarocq_pipeline.v
 Compiler/pipeline.v
 Compiler/correctness.v
+Compiler/wcbv_pipeline_flags_check.v
 
 # Extraction
 Extraction/extraction.v
