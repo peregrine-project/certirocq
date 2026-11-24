@@ -292,7 +292,7 @@ Section CC.
               (* environment argument to construct the closure *)
               y <- get_name x clo_suffix ;;
               ret (y, fun e => Econstr y clo_tag [x; env] e)
-      | BoundVar => ret (x, id)
+      | BoundVar => ret (x, fun e => e)
         end
       | None =>
         (* check if its a "global" function (i.e. one with no fvs) *)
@@ -302,14 +302,14 @@ Section CC.
           y <- get_name x clo_suffix ;;
           g_env <- get_name x "bogus_env" ;;
           ret (y, fun e => Econstr g_env env0_tag [] (Econstr y clo_tag [x; g_env] e))
-        | None => ret (x, id) (* should never reach here *)
+        | None => ret (x, fun e => e) (* should never reach here *)
         end
     end.
 
   Fixpoint get_vars (xs : list var) (map : VarInfoMap) (gfuns : GFunMap)
            (c : ctor_tag) (Γ : var) : ccstate (list var * (exp -> exp)) :=
     match xs with
-      | [] => ret ([], id)
+      | [] => ret ([], fun e => e)
       | x :: xs =>
         t1 <- get_var x map gfuns c Γ ;;
         let '(y, f) := t1 in
@@ -450,7 +450,7 @@ Section CC.
                           (Eapp ptr ft (Γ :: xs'))), fun e => g1 (g2 e))
     | Eprim_val x prim e' =>
       ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
-      ret (Eprim_val x prim ((snd ef) (fst ef)), id)
+      ret (Eprim_val x prim ((snd ef) (fst ef)), fun e => e)
     | Eprim x prim ys e' =>
       t1 <- get_vars ys mapfv gfuns c Γ ;;
       let '(ys', f) := t1 in

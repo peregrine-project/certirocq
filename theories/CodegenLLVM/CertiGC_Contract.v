@@ -1,27 +1,18 @@
-(** * CertiGC_Contract — the [garbage_collect] specification we ADOPT from CertiGC.
+(** * CertiGC_Contract: the contract of CertiGC's collector, in generic form
 
-    CertiGC (CertiGraph/CertiGC, Wang–Cao–Mohan–Hobor et al.) is a VST-verified
-    generational copying collector for CertiRocq — the very [gc_stack.c] our VIR
-    backend links and calls.  Rather than leave [garbage_collect] as an opaque
-    axiom, we adopt CertiGC's *proven* contract as a foreign-function interface
-    assumption (the standard "verified component across an FFI boundary" story:
-    CertiGC proves it in VST over CompCert's C memory; we consume it, stated over
-    Vellvm's memory, at the call boundary).
+    CertiGC (Wang, Cao, Mohan, Hobor et al.) verifies in VST the generational
+    copying collector [gc_stack.c] that the LLVM backend links.  This file
+    states its contract over abstract memories, addresses, roots and value
+    representations: called with the roots registered through [tinfo->fp] and
+    [tinfo->nalloc = n], the collector frees at least [n] words, updates the
+    roots to their relocated addresses, and preserves the representation of
+    every root up to the relocation.
 
-    The contract has two halves.  The PRECONDITION is exactly what the
-    shadow-stack root-registration pass (see [Flatten]/[LambdaANF_to_LLVM] GC
-    safepoints) must establish: every live value is reachable as a root through
-    the [tinfo->fp] frame chain, and [tinfo->nalloc = n].  The POSTCONDITION is
-    what CertiGC guarantees: the collector may RELOCATE objects (it copies), but
-    (i) it frees at least [n] words, (ii) it updates the roots to the relocated
-    addresses, and — the fact our [Econstr_case] needs — (iii) it PRESERVES the
-    value-representation of every root, up to that relocation.
-
-    We state it parametrically over the proof's memory ([Mem]), address ([Addr]),
-    root-set, the [words_free]/[roots_registered] predicates, and the
-    value-representation relation [ReprVal].  Instantiating [Mem := memory_stack],
-    [ReprVal := repr_val_LambdaANF_LLVM], etc. yields the concrete assumption that
-    discharges the GC half of the current [refinement_runs] axiom. *)
+    [LambdaANF_to_LLVM_correct] does not use this file.  Its hypothesis on the
+    collector is [runtime_correct] in [LambdaANF_to_LLVM_statement.v], stated
+    over Vellvm's memory.  No proof derives [runtime_correct] from CertiGC's
+    theorem; that would need a relation between CompCert's memory model and
+    Vellvm's. *)
 
 From Stdlib Require Import List. Import ListNotations.
 
@@ -64,12 +55,3 @@ Section CertiGC_Contract.
               In r roots -> ReprVal m v r -> ReprVal m' v (reloc r)).
 
 End CertiGC_Contract.
-
-(** To DISCHARGE the GC half of the current [refinement_runs] axiom, instantiate
-    the section variables with the Vellvm/proof concretes
-    ([Mem := memory_stack], [Addr := addr], [Val := term.val],
-    [ReprVal := fun m v a => repr_val_LambdaANF_LLVM … v m (DVALUE_Addr a)], …)
-    and assume [CertiGC_spec …] — an assumption BACKED BY CertiGC's VST proof,
-    not an unjustified axiom.  The remaining gap to a fully axiom-free result is
-    the cross-memory-model bridge (CompCert-C memory ↔ Vellvm memory), which is
-    orthogonal and flagged as future work. *)

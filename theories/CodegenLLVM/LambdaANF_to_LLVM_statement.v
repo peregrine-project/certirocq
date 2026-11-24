@@ -328,58 +328,81 @@ Section Runtime.
     mem_ok_stmt st /\ nursery_tinfo_disjoint_stmt st tinfo /\
     field st tinfo off_fp fp /\ shadow_stack st fp rs.
 
-  (** 1. [make_tinfo] runs out of memory or returns a [thread_info] in a
-         well-formed state with an empty shadow stack, that fits in the
-         address space.
-      2. The generated code preserves [heap_inv]: it only writes the
-         nursery and the [alloc]/[fp]/[nalloc] fields, and moves [alloc]
-         forward within the nursery, word-aligned.
-      3. The collector, called in a well-formed state whose roots represent
-         [vs], with a request for [nalloc] words, runs out of memory or
-         returns with the state well-formed again, the same roots
-         representing the same [vs], [nalloc] words of room, and the memory
-         frames unchanged.  Outside the heap it writes only the root slots;
-         every new heap address was unallocated (fresh [malloc]s); and the
-         root slots keep their Vellvm allocation ids (the generated code
-         reloads them through its own [alloca]).  Nothing is said about the
-         ids of heap bytes: a copying collector frees its from-space.
-         [nalloc] is at most the nursery size [max_chunk]; [gc_stack.c]
-         exits on a larger request, and [body_ok] excludes one. *)
+  (** [make_tinfo]: the allocation of the thread info.  Run from Vellvm's
+      initial state, [make_tinfo] runs out of memory or returns a pointer
+      [tinfo] to a [thread_info] in a well-formed state ([rt_ok]: [heap_inv],
+      [tinfo_ok], [mem_ok_stmt], nursery disjoint from [thread_info]) whose
+      shadow stack is empty ([fp] is null), and the [thread_info] fits in the
+      address space ([tinfo + 8232 < 2^64]).  It leaves the local and global
+      environments of Vellvm's initial state unchanged. *)
+  Definition rt_make_tinfo_ok (make_tinfo : MCFGtop dvalue) : Prop :=
+    ends_in_oom (interp_mcfg make_tinfo initial_fused)
+    \/ exists st tinfo fp,
+        returns (interp_mcfg make_tinfo initial_fused)
+                ((st, snd initial_fused), DVALUE_Base (DVALUE_Pointer tinfo)) /\
+        rt_ok st tinfo fp [] /\ ptr_to_int fp = 0 /\
+        ptr_to_int tinfo + 8232 < 2 ^ 64.
+
+  (** The generated code: what it writes, and [heap_inv] is preserved.
+      Between two calls of the collector the generated code changes no heap
+      block and writes only the nursery and the [alloc], [fp] and [nalloc]
+      fields of [thread_info] ([mutator_writes]); it moves [alloc] forward
+      within the nursery [alloc, limit), keeping it word-aligned.  The
+      runtime's [heap_inv] must hold again after every such change of a
+      state that satisfies [heap_inv] and [tinfo_ok]. *)
+  Definition rt_mutator_preserves : Prop :=
+    forall st st2 tinfo alloc alloc2 limit,
+      heap_inv st tinfo -> tinfo_ok st tinfo ->
+      heap_agree_except st st2 (mutator_writes st tinfo) ->
+      field st tinfo off_alloc alloc -> field st tinfo off_limit limit ->
+      field st2 tinfo off_alloc alloc2 ->
+      (ptr_to_int alloc <= ptr_to_int alloc2 <= ptr_to_int limit)%Z ->
+      (ptr_to_int alloc2 mod 8 = 0)%Z ->
+      heap_inv st2 tinfo.
+
+  (** The collector.  Called as [gc(tinfo)] in a well-formed state ([rt_ok])
+      whose root slots [rs] represent the values [vs] ([roots_ok]), with a
+      request of [nalloc] words in the [nalloc] field of [thread_info],
+      [0 <= nalloc <= max_chunk] (the nursery size; [gc_stack.c] exits on a
+      larger request, and [body_ok] excludes one), it runs out of memory or
+      returns [void] with the local and global environments unchanged and a
+      state [st'] in which:
+      - [rt_ok] holds again with the same shadow stack [fp] and slots [rs];
+      - the same slots represent the same [vs];
+      - the nursery has [nalloc] free words ([room]);
+      - the stack frames of Vellvm's memory are unchanged;
+      - outside the heap of [st], only the bytes of the root slots changed;
+      - every heap address of [st'] was a heap address of [st] or
+        unallocated in [st] (new heap blocks are fresh [malloc]s);
+      - the root slots keep their Vellvm allocation ids (the generated code
+        reloads them through its own [alloca]).
+      Nothing is said about the allocation ids of heap bytes: a copying
+      collector frees its from-space. *)
+  Definition rt_gc_ok (gc : list dvalue -> MCFGtop (exc + dvalue)) : Prop :=
+    forall (genv : global_env) (tinfo : ptr) (st : state) ls fp rs vs nalloc,
+      rt_ok st tinfo fp rs ->
+      roots_ok cenv fds genv st tinfo rs vs ->
+      0 <= nalloc <= Z.of_N LLVM_fragment.max_chunk ->
+      (exists a, ptr_off tinfo off_nalloc a /\ reads_word st a nalloc) ->
+      ends_in_oom (interp_mcfg (gc [DVALUE_Base (DVALUE_Pointer tinfo)]) (st, (ls, genv)))
+      \/ exists st',
+          returns (interp_mcfg (gc [DVALUE_Base (DVALUE_Pointer tinfo)]) (st, (ls, genv)))
+                  ((st', (ls, genv)), inr (DVALUE_Base DVALUE_None)) /\
+          rt_ok st' tinfo fp rs /\
+          roots_ok cenv fds genv st' tinfo rs vs /\
+          room st' tinfo nalloc /\
+          frames_of st' = frames_of st /\
+          (forall a, ~ in_heap st a -> ~ slot_bytes_stmt rs a ->
+                     IntMaps.lookup a (mem_of st') = IntMaps.lookup a (mem_of st)) /\
+          (forall a, in_heap st' a -> in_heap st a \/ IntMaps.lookup a (mem_of st) = None) /\
+          (forall a, slot_bytes_stmt rs a ->
+             option_map snd (IntMaps.lookup a (mem_of st')) =
+             option_map snd (IntMaps.lookup a (mem_of st))).
+
+  (** The runtime contract: the three parts above. *)
   Definition runtime_correct (gc : list dvalue -> MCFGtop (exc + dvalue))
              (make_tinfo : MCFGtop dvalue) : Prop :=
-    (ends_in_oom (interp_mcfg make_tinfo initial_fused)
-     \/ exists st tinfo fp,
-         returns (interp_mcfg make_tinfo initial_fused)
-                 ((st, snd initial_fused), DVALUE_Base (DVALUE_Pointer tinfo)) /\
-         rt_ok st tinfo fp [] /\ ptr_to_int fp = 0 /\
-         ptr_to_int tinfo + 8232 < 2 ^ 64) /\
-    (forall st st2 tinfo alloc alloc2 limit,
-       heap_inv st tinfo -> tinfo_ok st tinfo ->
-       heap_agree_except st st2 (mutator_writes st tinfo) ->
-       field st tinfo off_alloc alloc -> field st tinfo off_limit limit ->
-       field st2 tinfo off_alloc alloc2 ->
-       (ptr_to_int alloc <= ptr_to_int alloc2 <= ptr_to_int limit)%Z ->
-       (ptr_to_int alloc2 mod 8 = 0)%Z ->
-       heap_inv st2 tinfo) /\
-    (forall (genv : global_env) (tinfo : ptr) (st : state) ls fp rs vs nalloc,
-       rt_ok st tinfo fp rs ->
-       roots_ok cenv fds genv st tinfo rs vs ->
-       0 <= nalloc <= Z.of_N LLVM_fragment.max_chunk ->
-       (exists a, ptr_off tinfo off_nalloc a /\ reads_word st a nalloc) ->
-       ends_in_oom (interp_mcfg (gc [DVALUE_Base (DVALUE_Pointer tinfo)]) (st, (ls, genv)))
-       \/ exists st',
-           returns (interp_mcfg (gc [DVALUE_Base (DVALUE_Pointer tinfo)]) (st, (ls, genv)))
-                   ((st', (ls, genv)), inr (DVALUE_Base DVALUE_None)) /\
-           rt_ok st' tinfo fp rs /\
-           roots_ok cenv fds genv st' tinfo rs vs /\
-           room st' tinfo nalloc /\
-           frames_of st' = frames_of st /\
-           (forall a, ~ in_heap st a -> ~ slot_bytes_stmt rs a ->
-                      IntMaps.lookup a (mem_of st') = IntMaps.lookup a (mem_of st)) /\
-           (forall a, in_heap st' a -> in_heap st a \/ IntMaps.lookup a (mem_of st) = None) /\
-           (forall a, slot_bytes_stmt rs a ->
-              option_map snd (IntMaps.lookup a (mem_of st')) =
-              option_map snd (IntMaps.lookup a (mem_of st)))).
+    rt_make_tinfo_ok make_tinfo /\ rt_mutator_preserves /\ rt_gc_ok gc.
 End Runtime.
 
 (* ------------------------------------------------------------------ *)

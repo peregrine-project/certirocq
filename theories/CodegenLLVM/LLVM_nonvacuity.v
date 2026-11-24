@@ -551,14 +551,19 @@ Proof.
     rewrite (field_det' _ _ _ _ _ Fa' Fa) in Ha. rewrite Eqa in Ha. rewrite Et. lia.
 Qed.
 
+(** The three parts of [runtime_correct], proved separately. *)
+Theorem nv_make_tinfo_ok : rt_make_tinfo_ok nv_heap_inv nv_make_tinfo.
+Proof. right. exact nv_make_tinfo_returns. Qed.
+
+Theorem nv_mutator_preserves : rt_mutator_preserves nv_heap_inv.
+Proof. unfold rt_mutator_preserves. intros. exact I. Qed.
+
+Theorem nv_gc_ok cenv fds : rt_gc_ok cenv fds nv_heap_inv nv_gc.
+Proof. unfold rt_gc_ok. intros. left. unfold nv_gc. apply interp_mcfg_raiseOOM. Qed.
+
 Theorem nv_runtime_correct cenv fds :
   runtime_correct cenv fds nv_heap_inv nv_gc nv_make_tinfo.
-Proof.
-  split; [|split].
-  - right. exact nv_make_tinfo_returns.
-  - intros. exact I.
-  - intros. left. unfold nv_gc. apply interp_mcfg_raiseOOM.
-Qed.
+Proof. exact (conj nv_make_tinfo_ok (conj nv_mutator_preserves (nv_gc_ok cenv fds))). Qed.
 
 (** Our [make_tinfo] does not run out of memory: it takes the [returns]
     branch of the first clause of [runtime_correct]. *)
@@ -656,13 +661,10 @@ Qed.
 
 (** [nv_gc_check] meets the collector clause, with [st' = st]: every frame
     condition is trivial and [room] comes from the branch condition. *)
-Theorem nv_runtime_correct_check cenv fds :
-  runtime_correct cenv fds nv_heap_inv nv_gc_check nv_make_tinfo.
+Theorem nv_gc_check_ok cenv fds : rt_gc_ok cenv fds nv_heap_inv nv_gc_check.
 Proof.
-  split; [|split].
-  - right. exact nv_make_tinfo_returns.
-  - intros. exact I.
-  - intros genv tinfo st ls fp rs vs nalloc Hok_rt Hroots Hn Hna.
+  unfold rt_gc_ok.
+  intros genv tinfo st ls fp rs vs nalloc Hok_rt Hroots Hn Hna.
     pose proof Hok_rt as (_ & Hok & _).
     assert (Hn' : 0 <= nalloc < 2 ^ 61) by (unfold LLVM_fragment.max_chunk in Hn; lia).
     destruct (nv_gc_check_run tinfo st (ls, genv) nalloc Hok Hn' Hna) as [Ho|(Hr & Hroom)];
@@ -671,6 +673,10 @@ Proof.
     split; [exact Hroom|]. split; [reflexivity|]. split; [intros; reflexivity|].
     split; [intros a Ha; left; exact Ha|]. intros; reflexivity.
 Qed.
+
+Theorem nv_runtime_correct_check cenv fds :
+  runtime_correct cenv fds nv_heap_inv nv_gc_check nv_make_tinfo.
+Proof. exact (conj nv_make_tinfo_ok (conj nv_mutator_preserves (nv_gc_check_ok cenv fds))). Qed.
 
 
 (* ------------------------------------------------------------------ *)
@@ -776,8 +782,8 @@ Lemma oom_runtime_correct cenv fds :
 Proof.
   split; [|split].
   - left. apply interp_mcfg_raiseOOM.
-  - intros. exact I.
-  - intros. left. unfold nv_gc. apply interp_mcfg_raiseOOM.
+  - exact nv_mutator_preserves.
+  - exact (nv_gc_ok cenv fds).
 Qed.
 
 Lemma oom_runtime_vacuous cenv prim_of e :
